@@ -96,6 +96,11 @@ export function commonProjectScanRoots(home = homedir()) {
   ];
 }
 
+// The folders scanned at startup: the common ones and the saved scan folders unless --no-scan, plus every --scan-root.
+export function startupScanRoots({ scan = true, extra = [], state = normalizeState(null), home = homedir() } = {}) {
+  return [...new Set([...(scan ? [...commonProjectScanRoots(home), ...state.scanRoots] : []), ...extra])];
+}
+
 export function discoverProjects({
   currentRoot = discoverProjectRoot(),
   projectRoots = [],
@@ -265,6 +270,7 @@ export function legacyStatePaths() {
 }
 
 const STATE_LIST_LIMIT = 500;
+const MAX_SCAN_FOLDERS = 20;
 const cleanList = (value) => (Array.isArray(value) ? [...new Set(value.filter((item) => typeof item === "string" && item.length > 0 && item.length <= 400))].slice(0, STATE_LIST_LIMIT) : []);
 
 export function normalizeState(raw) {
@@ -276,6 +282,8 @@ export function normalizeState(raw) {
     collapsed: cleanList(value.collapsed),
     closedStacks: cleanList(value.closedStacks),
     knownRoots: cleanList(value.knownRoots),
+    // Folders of projects the user added with Open project; they are scanned at every start like the common ones.
+    scanRoots: cleanList(value.scanRoots).slice(0, MAX_SCAN_FOLDERS),
     // Off unless the user turned it on: logs and doctor output are only offered to an AI service after an explicit opt-in.
     aiInspect: value.aiInspect === true,
   };
@@ -1127,7 +1135,7 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
         const home = homedir();
         const roots = commonProjectScanRoots().filter((root) => existsSync(root));
         const tilde = (path) => (path === home ? "~" : path.startsWith(home + sep) ? `~${path.slice(home.length)}` : path);
-        return sendJson(response, 200, { defaultParent: tilde(roots.find((root) => root.startsWith(home)) ?? home), roots: roots.map(tilde), templates: PROJECT_TEMPLATES, resourceTypes: RESOURCE_TYPES });
+        return sendJson(response, 200, { defaultParent: tilde(roots.find((root) => root.startsWith(home)) ?? home), roots: [...new Set([...appState.scanRoots, ...roots].map(tilde))], templates: PROJECT_TEMPLATES, resourceTypes: RESOURCE_TYPES });
       }
       if (url.pathname === "/api/resources" && request.method === "POST") {
         const body = await readBody(request);
@@ -1202,7 +1210,8 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
       }
       if (url.pathname === "/api/state" && request.method === "PUT") {
         const body = await readBody(request);
-        const next = normalizeState({ ...appState, ...body, knownRoots: appState.knownRoots });
+        // Known projects and scan folders change only through Open project and Stop scanning, never from the page's state.
+        const next = normalizeState({ ...appState, ...body, knownRoots: appState.knownRoots, scanRoots: appState.scanRoots });
         appState = next;
         if (statePath) writeAppState(appState, statePath);
         const { knownRoots, ...visible } = appState;
@@ -1218,18 +1227,39 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
       }
       if (url.pathname === "/api/projects/add" && request.method === "POST") {
         // Registers an existing Flisk project that the scan did not find, for example one outside the common folders.
+        // A folder with projects below it (such as ~/code) is saved as a scan folder and scanned at every start.
         const body = await readBody(request);
         const root = allowedParent(body.path);
         if (!root) return sendJson(response, 400, { error: "Choose an existing folder inside your home directory." });
-        if (!projectFile(root)) return sendJson(response, 400, { error: "No .flisk/project.json in that folder. Choose the folder that contains .flisk, or create a new project." });
-        const [added] = resolveProjects(null, [root]);
-        const known = projects.find((entry) => entry.root === added.root);
-        if (!known) projects.push(added);
-        if (!appState.knownRoots.includes(added.root)) {
-          appState = normalizeState({ ...appState, knownRoots: [...appState.knownRoots, added.root] });
-          if (statePath) writeAppState(appState, statePath);
+        const scanFolder = !projectFile(root);
+        const found = scanFolder ? discoverProjects({ currentRoot: null, scanRoots: [root] }) : resolveProjects(null, [root]);
+        if (!found.length) return sendJson(response, 400, { error: "No Flisk project in that folder or below it. Choose a folder that contains .flisk (or one with projects inside), or create a new project." });
+        if (scanFolder && !appState.scanRoots.includes(root) && appState.scanRoots.length >= MAX_SCAN_FOLDERS) {
+          return sendJson(response, 409, { error: `FliskOS already scans ${MAX_SCAN_FOLDERS} folders. Stop scanning one first.` });
         }
-        return sendJson(response, 200, { ok: true, alreadyListed: Boolean(known), project: { id: added.id, name: added.name, path: added.root } });
+        const added = found.filter((project) => !projects.some((entry) => entry.root === project.root));
+        projects.push(...added);
+        appState = normalizeState({
+          ...appState,
+          knownRoots: [...appState.knownRoots, ...found.map((project) => project.root)],
+          scanRoots: scanFolder ? [...appState.scanRoots, root] : appState.scanRoots,
+        });
+        if (statePath) writeAppState(appState, statePath);
+        const listed = (project) => ({ id: project.id, name: project.name, path: project.root });
+        if (scanFolder) return sendJson(response, 200, { ok: true, scanFolder: { path: root, found: found.length, added: added.length }, scanRoots: appState.scanRoots, projects: found.map(listed) });
+        return sendJson(response, 200, { ok: true, alreadyListed: !added.length, project: listed(found[0]) });
+      }
+      if (url.pathname === "/api/scan-folders/remove" && request.method === "POST") {
+        // Stops scanning a saved folder. Projects already listed stay; hide any you no longer want.
+        const body = await readBody(request);
+        if (typeof body.path !== "string" || !body.path || body.path.includes("\0")) return sendJson(response, 400, { error: "Choose a scan folder." });
+        // The page shows paths with the home folder as ~, so accept that form too.
+        const target = body.path === "~" || body.path.startsWith("~/") ? join(homedir(), body.path.slice(1)) : body.path;
+        const matches = (saved) => saved === target || resolvedPath(saved) === resolvedPath(target);
+        if (!appState.scanRoots.some(matches)) return sendJson(response, 404, { error: "FliskOS does not scan that folder." });
+        appState = normalizeState({ ...appState, scanRoots: appState.scanRoots.filter((saved) => !matches(saved)) });
+        if (statePath) writeAppState(appState, statePath);
+        return sendJson(response, 200, { ok: true, scanRoots: appState.scanRoots });
       }
       if (url.pathname === "/api/projects/create" && request.method === "POST") {
         const body = await readBody(request);

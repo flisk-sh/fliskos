@@ -975,7 +975,8 @@ describe("persistent UI state (pins, hidden, collapsed)", () => {
     const { server } = await boot({ statePath: join(tempDir(), "state.json") });
     const response = await raw(server, { path: "/api/state" });
     assert.equal(response.status, 200);
-    assert.deepEqual(response.json, { pins: { projects: [], resources: [] }, hidden: [], collapsed: [], closedStacks: [], aiInspect: false });
+    // Saved scan folders are shown on the overview, so the page sees them; known project roots stay server-side.
+    assert.deepEqual(response.json, { pins: { projects: [], resources: [] }, hidden: [], collapsed: [], closedStacks: [], scanRoots: [], aiInspect: false });
   });
 
   it("keeps AI inspect off unless it is explicitly saved as true", async () => {
