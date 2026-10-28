@@ -1,23 +1,26 @@
 {
-  "name": "@flisk-sh/flisk-app",
-  "version": "0.1.0",
-  "description": "Local desktop command center for Flisk projects",
+  "name": "@flisk-sh/fliskos",
+  "version": "0.2.0",
+  "description": "FliskOS: your Flisk projects, your coding agents and the Flisk apps in one local window",
   "license": "MIT",
-  "homepage": "https://github.com/flisk-sh/flisk-app#readme",
+  "homepage": "https://github.com/flisk-sh/fliskos#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flisk-sh/flisk-app.git"
+    "url": "git+https://github.com/flisk-sh/fliskos.git"
   },
   "bugs": {
-    "url": "https://github.com/flisk-sh/flisk-app/issues"
+    "url": "https://github.com/flisk-sh/fliskos/issues"
   },
   "type": "module",
   "bin": {
+    "fliskos": "src/cli.js",
     "flisk-app": "src/cli.js"
   },
   "scripts": {
     "start": "node src/cli.js",
+    "start:bun": "bun src/cli.js",
     "test": "node --test",
+    "test:bun": "bun test test/",
     "test:browser": "node --test browser-checks/*.mjs",
     "build:mac": "./macos/build.sh",
     "install:mac": "./macos/install.sh"

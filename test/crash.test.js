@@ -1289,7 +1289,8 @@ describe("server lifecycle", () => {
   it("fails cleanly when the port is already taken", async () => {
     const { server } = await boot();
     const { port } = server.address();
-    await assert.rejects(() => startAppServer({ projects, port }), /EADDRINUSE/);
+    // Node puts the code in the message, Bun only on the error, so check the code.
+    await assert.rejects(() => startAppServer({ projects, port }), (error) => error.code === "EADDRINUSE");
     await assertAlive(server);
   });
 

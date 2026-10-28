@@ -4,10 +4,18 @@ import { createServer } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
+import { AGENT_PROMPT_LIMIT, AgentError, createAgentHub } from "./agents.js";
+import { appsForProject } from "./apps.js";
 import { createTokenCache } from "./token-savings.js";
 
-const PROJECT_FILE = join(".tdk", "project.json");
-const PORT_FILE = join(".tdk", ".tdk-out", "tilt-port.json");
+const APP_VERSION = (() => {
+  try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; }
+})();
+
+// Current CLIs keep a project's config in .flisk/; projects made before the rename still have .tdk/.
+const PROJECT_DIRS = [".flisk", ".tdk"];
+const PROJECT_FILES = PROJECT_DIRS.map((dir) => join(dir, "project.json"));
+const PORT_FILES = [join(".flisk", ".flisk-out", "tilt-port.json"), join(".tdk", ".tdk-out", "tilt-port.json")];
 const MAX_BODY = 64 * 1024;
 const MAX_SCAN_DEPTH = 8;
 const MAX_DIRECTORIES_PER_ROOT = 25_000;
@@ -20,12 +28,18 @@ const HTML = readFileSync(new URL("../public/index.html", import.meta.url), "utf
 const CLIENT_SCRIPTS = new Map([
   ["/app.js", readFileSync(new URL("../public/app.js", import.meta.url), "utf8")],
   ["/inspect.js", readFileSync(new URL("../public/inspect.js", import.meta.url), "utf8")],
+  ["/os.js", readFileSync(new URL("../public/os.js", import.meta.url), "utf8")],
 ]);
+
+// The project.json a Flisk project root carries, .flisk/ first, or null when the folder is not a project.
+export function projectFile(root) {
+  return PROJECT_FILES.map((file) => join(root, file)).find((path) => existsSync(path)) ?? null;
+}
 
 export function discoverProjectRoot(start = process.cwd()) {
   let directory = resolve(start);
   while (true) {
-    if (existsSync(join(directory, PROJECT_FILE))) return directory;
+    if (projectFile(directory)) return directory;
     const parent = dirname(directory);
     if (parent === directory) return null;
     directory = parent;
@@ -34,7 +48,7 @@ export function discoverProjectRoot(start = process.cwd()) {
 
 function projectName(root) {
   try {
-    const value = JSON.parse(readFileSync(join(root, PROJECT_FILE), "utf8"));
+    const value = JSON.parse(readFileSync(projectFile(root), "utf8"));
     return typeof value.project?.name === "string" ? value.project.name : basename(root);
   } catch {
     return basename(root);
@@ -44,7 +58,7 @@ function projectName(root) {
 export function resolveProjects(currentRoot, additionalRoots = []) {
   const roots = [...new Set([...(currentRoot ? [resolve(currentRoot)] : []), ...additionalRoots.map((root) => resolve(root))])];
   return roots.map((root) => {
-    if (!isAbsolute(root) || !existsSync(join(root, PROJECT_FILE))) {
+    if (!isAbsolute(root) || !projectFile(root)) {
       throw new Error(`Not a Flisk project directory: ${root}`);
     }
     return {
@@ -100,7 +114,7 @@ export function discoverProjects({
     while (queue.length && visited < maxDirectoriesPerRoot && discovered.size < maxProjects) {
       const current = queue.shift();
       visited += 1;
-      if (existsSync(join(current.path, PROJECT_FILE))) {
+      if (projectFile(current.path)) {
         discovered.add(current.path);
         continue;
       }
@@ -113,7 +127,7 @@ export function discoverProjects({
       }
       for (const entry of entries) {
         if (!entry.isDirectory() || entry.isSymbolicLink() || SCAN_SKIP_NAMES.has(entry.name)) continue;
-        if (entry.name.startsWith(".") && entry.name !== ".tdk") continue;
+        if (entry.name.startsWith(".") && !PROJECT_DIRS.includes(entry.name)) continue;
         queue.push({ path: join(current.path, entry.name), depth: current.depth + 1 });
       }
     }
@@ -233,20 +247,21 @@ export function cleanupCandidates(home = homedir()) {
 // ---------- Persistent UI state (pins, hidden projects, collapsed sections, known project roots) ----------
 // The page's origin changes with the random port, so browser storage does not survive a restart; this file does.
 export function defaultStatePath() {
+  if (process.env.FLISKOS_STATE) return process.env.FLISKOS_STATE;
+  // The app was called Flisk App, and TDK App before that; the old overrides keep working.
   if (process.env.FLISK_APP_STATE) return process.env.FLISK_APP_STATE;
-  // The app was called TDK App before the rename; the old override keeps working.
   if (process.env.TDK_APP_STATE) return process.env.TDK_APP_STATE;
   return process.platform === "darwin"
-    ? join(homedir(), "Library", "Application Support", "Flisk App", "state.json")
-    : join(homedir(), ".config", "flisk-app", "state.json");
+    ? join(homedir(), "Library", "Application Support", "FliskOS", "state.json")
+    : join(homedir(), ".config", "fliskos", "state.json");
 }
 
-// The state file moved with the rename. Read the old location until the new one exists,
+// The state file moved with each rename. Read the newest old location until the new one exists,
 // so pins, hidden projects and known roots survive the upgrade.
 export function legacyStatePaths() {
   return process.platform === "darwin"
-    ? [join(homedir(), "Library", "Application Support", "TDK App", "state.json")]
-    : [join(homedir(), ".config", "tdk-app", "state.json")];
+    ? [join(homedir(), "Library", "Application Support", "Flisk App", "state.json"), join(homedir(), "Library", "Application Support", "TDK App", "state.json")]
+    : [join(homedir(), ".config", "flisk-app", "state.json"), join(homedir(), ".config", "tdk-app", "state.json")];
 }
 
 const STATE_LIST_LIMIT = 500;
@@ -338,10 +353,12 @@ function readMachine(result) {
 }
 
 export function savedTiltPort(root) {
-  try {
-    const value = JSON.parse(readFileSync(join(root, PORT_FILE), "utf8"));
-    if (Number.isInteger(value.port) && value.port > 0 && value.port <= 65535) return value.port;
-  } catch {}
+  for (const file of PORT_FILES) {
+    try {
+      const value = JSON.parse(readFileSync(join(root, file), "utf8"));
+      if (Number.isInteger(value.port) && value.port > 0 && value.port <= 65535) return value.port;
+    } catch {}
+  }
   return null;
 }
 
@@ -416,11 +433,7 @@ export function cliCommandName(env = process.env) {
 
 export function runTdk(project, args, { binary = CLI_FALLBACK_NAME, timeoutMs = 30_000, detached = false } = {}) {
   return new Promise((resolvePromise) => {
-    let savedPort;
-    try {
-      const value = JSON.parse(readFileSync(join(project.root, PORT_FILE), "utf8"));
-      if (Number.isInteger(value.port) && value.port > 0 && value.port <= 65535) savedPort = value.port;
-    } catch {}
+    const savedPort = project.root ? savedTiltPort(project.root) : null;
     // GUI apps inherit a much smaller PATH than a terminal. Flisk projects on
     // macOS commonly install Bun under ~/.bun/bin, so expose that location to
     // child CLI processes even when the app was launched from Finder/Launchpad.
@@ -736,8 +749,27 @@ function findConflicts(snapshots) {
   return [...owners].filter(([, claimants]) => claimants.length > 1).map(([port, claimants]) => ({ port, claimants }));
 }
 
-export function startAppServer({ projects, projectsReady = Promise.resolve(), probe = probeCli, host = "127.0.0.1", port = 0, token = randomBytes(32).toString("hex"), runCommand = runTdk, openPath = openProjectPath, claudeDesktopApp = findClaudeDesktopApp, openAiApp = openInClaudeApp, dockerCheck = checkDocker, dockerRestart = restartContainerRuntime, prewarm = false, statePath = null }) {
-  if (host !== "127.0.0.1") throw new Error("Flisk App can only bind to 127.0.0.1.");
+// A short description of the project's stack that goes to the agent after the first prompt of a thread.
+export function stackContext(project, snapshot) {
+  const lines = [`Flisk project "${project.name}" at ${project.root}. Flisk runs it locally on Docker and Tilt: \`flisk status --json\` shows the stack, \`flisk logs <resource>\` its logs, and \`flisk up\` / \`flisk down\` start and stop it.`];
+  const resources = Array.isArray(snapshot?.resources) ? snapshot.resources : [];
+  if (resources.length) {
+    lines.push(`Stack status from FliskOS: ${snapshot.tiltRunning ? "running" : "stopped"}.`);
+    for (const resource of resources.slice(0, 40)) {
+      lines.push(`- ${resource.name}${resource.type ? ` (${resource.type})` : ""}${resource.stack ? `, stack ${resource.stack}` : ""}: ${resource.status ?? "unknown"}${resource.url ? `, ${resource.url}` : ""}`);
+    }
+    if (resources.length > 40) lines.push(`- and ${resources.length - 40} more`);
+  }
+  return lines.join("\n");
+}
+
+const agentPrompt = (value) => (typeof value === "string" && value.trim() && value.length <= AGENT_PROMPT_LIMIT ? value.trim() : null);
+const PROMPT_ERROR = `Write a prompt of up to ${AGENT_PROMPT_LIMIT.toLocaleString("en-US")} characters.`;
+
+export function startAppServer({ projects, projectsReady = Promise.resolve(), probe = probeCli, host = "127.0.0.1", port = 0, token = randomBytes(32).toString("hex"), runCommand = runTdk, openPath = openProjectPath, claudeDesktopApp = findClaudeDesktopApp, openAiApp = openInClaudeApp, dockerCheck = checkDocker, dockerRestart = restartContainerRuntime, prewarm = false, statePath = null, agents = null }) {
+  if (host !== "127.0.0.1") throw new Error("FliskOS can only bind to 127.0.0.1.");
+  // Threads are kept next to the state file, so they survive a restart; without a state file they live in memory.
+  const hub = agents ?? createAgentHub({ dir: statePath ? join(dirname(statePath), "threads") : null, appVersion: APP_VERSION });
   let capability = null;
   let updating = false;
   const tokenCache = createTokenCache();
@@ -765,7 +797,8 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
     if (result.status === 0) {
       try {
         const path = JSON.parse(result.stdout)?.items?.[0]?.spec?.path;
-        if (typeof path === "string") root = resolvedPath(path.split(`${sep}.tdk${sep}`)[0]);
+        // The Tiltfile lives in the project's .flisk/ (or legacy .tdk/) folder, so the part before it is the root.
+        if (typeof path === "string") root = resolvedPath(path.split(new RegExp(`\\${sep}\\.(?:flisk|tdk)\\${sep}`))[0]);
       } catch {}
     }
     tiltOwners.set(port, { at: Date.now(), root });
@@ -1188,7 +1221,7 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
         const body = await readBody(request);
         const root = allowedParent(body.path);
         if (!root) return sendJson(response, 400, { error: "Choose an existing folder inside your home directory." });
-        if (!existsSync(join(root, PROJECT_FILE))) return sendJson(response, 400, { error: `No ${PROJECT_FILE} in that folder. Choose the folder that contains .tdk, or create a new project.` });
+        if (!projectFile(root)) return sendJson(response, 400, { error: "No .flisk/project.json in that folder. Choose the folder that contains .flisk, or create a new project." });
         const [added] = resolveProjects(null, [root]);
         const known = projects.find((entry) => entry.root === added.root);
         if (!known) projects.push(added);
@@ -1215,7 +1248,7 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
           result = actionResult(await runCommand({ root: target }, ["project", "--yes"], { timeoutMs: 120_000 }));
           if (!result.ok) { try { rmdirSync(target); } catch {} }
         }
-        if (result.ok && existsSync(join(target, PROJECT_FILE))) {
+        if (result.ok && projectFile(target)) {
           const [created] = resolveProjects(null, [target]);
           if (!projects.some((entry) => entry.root === created.root)) projects.push(created);
           return sendJson(response, 200, { ...result, project: { id: created.id, name: created.name, path: created.root } });
@@ -1231,6 +1264,47 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
         await openAiApp(app, body.prompt);
         return sendJson(response, 200, { ok: true, opened: "claude-desktop" });
       }
+      if (url.pathname === "/api/agents" && request.method === "GET") {
+        return sendJson(response, 200, { providers: await hub.providers() });
+      }
+      if (url.pathname === "/api/agents/threads" && request.method === "GET") {
+        return sendJson(response, 200, { threads: hub.list(url.searchParams.get("project") || null) });
+      }
+      if (url.pathname === "/api/agents/threads" && request.method === "POST") {
+        const body = await readBody(request);
+        const project = typeof body.project === "string" ? projects.find((entry) => entry.id === body.project) : null;
+        const prompt = agentPrompt(body.prompt);
+        if (!project) return sendJson(response, 400, { error: "Choose a project for the agent to work in." });
+        if (!prompt) return sendJson(response, 400, { error: PROMPT_ERROR });
+        const context = body.withStack === false ? null : stackContext(project, statusCache.get(project.id)?.snapshot);
+        return sendJson(response, 202, { thread: hub.start({ project, provider: body.provider, mode: body.mode, prompt, context }) });
+      }
+      if (url.pathname === "/api/agents/thread" && request.method === "GET") {
+        const thread = hub.get(url.searchParams.get("id") ?? "");
+        // The page polls while an agent works; an unchanged thread answers with its version only.
+        if (url.searchParams.get("version") === String(thread.version)) return sendJson(response, 200, { unchanged: true, version: thread.version, state: thread.state });
+        return sendJson(response, 200, { thread });
+      }
+      if (url.pathname === "/api/agents/thread/send" && request.method === "POST") {
+        const body = await readBody(request);
+        const prompt = agentPrompt(body.prompt);
+        if (!prompt) return sendJson(response, 400, { error: PROMPT_ERROR });
+        return sendJson(response, 202, { thread: hub.send(String(body.id ?? ""), { prompt }) });
+      }
+      if (url.pathname === "/api/agents/thread/stop" && request.method === "POST") {
+        const body = await readBody(request);
+        return sendJson(response, 200, hub.stop(String(body.id ?? "")));
+      }
+      if (url.pathname === "/api/agents/thread/delete" && request.method === "POST") {
+        const body = await readBody(request);
+        return sendJson(response, 200, hub.remove(String(body.id ?? "")));
+      }
+      if (url.pathname === "/api/apps" && request.method === "GET") {
+        const id = url.searchParams.get("project");
+        const project = id ? projects.find((entry) => entry.id === id) : null;
+        if (id && !project) return sendJson(response, 400, { error: "Select a project." });
+        return sendJson(response, 200, { apps: appsForProject(project, project ? statusCache.get(project.id)?.snapshot?.resources ?? [] : []) });
+      }
       if (url.pathname === "/api/open" && request.method === "POST") {
         const body = await readBody(request);
         const project = typeof body.project === "string" ? projects.find((entry) => entry.id === body.project) : null;
@@ -1240,16 +1314,18 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
       }
       return sendJson(response, 404, { error: "Not found." });
     })().catch((error) => {
-      if (!response.headersSent) sendJson(response, error instanceof HttpError ? error.status : 500, { error: error instanceof Error ? error.message : String(error) });
+      if (!response.headersSent) sendJson(response, error instanceof HttpError || error instanceof AgentError ? error.status : 500, { error: error instanceof Error ? error.message : String(error) });
       else response.destroy(error instanceof Error ? error : undefined);
     });
   });
+  // Agents work in the user's projects, so none may outlive the server.
+  server.once("close", () => hub.shutdown());
   return new Promise((resolvePromise, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {
       server.removeListener("error", reject);
       const address = server.address();
-      resolvePromise({ server, token, url: `http://127.0.0.1:${address.port}/?token=${token}` });
+      resolvePromise({ server, token, agents: hub, url: `http://127.0.0.1:${address.port}/?token=${token}` });
     });
   });
 }
