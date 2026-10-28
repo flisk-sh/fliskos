@@ -28,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Double(ProcessInfo.processInfo.environment["FLISK_WINDOW_WIDTH"] ?? "") ?? 1180, height: 780),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
-        window.title = "Flisk App"
+        window.title = "FliskOS"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         // Content runs under the (transparent) title bar; a thin strip keeps the window draggable.
@@ -89,18 +89,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         // The login shell sources user profiles, which can put Intel Homebrew
         // ahead of the native Apple Silicon tools. Reapply this path after the
         // login shell starts so Colima resolves the native limactl first.
-        environment["FLISK_APP_PATH"] = appPath
+        environment["FLISKOS_PATH"] = appPath
         process.environment = environment
         // Start a login shell so Node managers (nvm, bun) initialize their PATH.
         process.executableURL = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh")
-        // Resolve node while the login shell's PATH is still loaded (nvm, bun, Homebrew all
-        // set it there), then exec that absolute path. Exit 127 means node was not found.
+        // Resolve node (or bun, which runs the same server) while the login shell's PATH is still
+        // loaded (nvm, bun, Homebrew all set it there), then exec that absolute path. Exit 127 means neither was found.
         let script = """
-        NODE=$(command -v node) || { echo "node not found on PATH; install Node.js 22.12+ or add it to ~/.zprofile" >&2; exit 127; }
-        export PATH="$FLISK_APP_PATH:$PATH"; unset FLISK_APP_PATH
+        NODE=$(command -v node || command -v bun) || { echo "Neither node nor bun is on PATH; install Node.js 22.12+ or Bun, or add it to ~/.zprofile" >&2; exit 127; }
+        export PATH="$FLISKOS_PATH:$PATH"; unset FLISKOS_PATH
         exec "$NODE" "$1" --no-open
         """
-        process.arguments = ["-l", "-c", script, "flisk-app", "\(resources)/app/src/cli.js"]
+        process.arguments = ["-l", "-c", script, "fliskos", "\(resources)/app/src/cli.js"]
         let out = Pipe(), err = Pipe(), stdin = Pipe()
         process.standardOutput = out
         process.standardError = err
@@ -121,11 +121,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             let message = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
             DispatchQueue.main.async {
                 if proc.terminationReason == .exit && proc.terminationStatus != 0 {
-                    self?.fail("Server exited (\(proc.terminationStatus)).\n\n\(message.isEmpty ? "Is Node.js 22.12+ installed and on your PATH?" : message)")
+                    self?.fail("Server exited (\(proc.terminationStatus)).\n\n\(message.isEmpty ? "Is Node.js 22.12+ or Bun installed and on your PATH?" : message)")
                 }
             }
         }
-        do { try process.run(); server = process } catch { fail("Could not start Node: \(error)") }
+        do { try process.run(); server = process } catch { fail("Could not start the server: \(error)") }
     }
 
     func fail(_ message: String) {
@@ -190,7 +190,7 @@ let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(.regular)
 let menu = NSMenu(), appItem = NSMenuItem(), appMenu = NSMenu()
-appMenu.addItem(withTitle: "Quit Flisk App", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+appMenu.addItem(withTitle: "Quit FliskOS", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 appItem.submenu = appMenu; menu.addItem(appItem)
 let edit = NSMenuItem(), editMenu = NSMenu(title: "Edit")
 editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")

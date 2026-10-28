@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { TOOL_COMMANDS, cliBinaryCandidates, commonProjectScanRoots, discoverProjectRoot, discoverProjects, findClaudeDesktopApp, normalizeState, probeCli, resolveProjects, resolveTdkBinary, startAppServer } from "../src/app.js";
+import { TOOL_COMMANDS, cliBinaryCandidates, commonProjectScanRoots, discoverProjectRoot, discoverProjects, findClaudeDesktopApp, normalizeState, probeCli, projectFile, resolveProjects, resolveTdkBinary, startAppServer } from "../src/app.js";
 
 const servers = [];
 const tempDirs = [];
@@ -173,7 +173,7 @@ describe("CLI capability probe naming", () => {
   });
 });
 
-describe("Flisk App local server", () => {
+describe("FliskOS local server", () => {
   it("rejects lifecycle actions without spawning a mutating command when unsupported", async () => {
     const calls = [];
     const runCommand = async (_project, args) => {
@@ -241,6 +241,41 @@ describe("Flisk App local server", () => {
     const projects = discoverProjects({ currentRoot: null, scanRoots: [root] });
     assert.deepEqual(projects.map((entry) => entry.root), [project]);
     assert(commonProjectScanRoots("/Users/example").includes("/var/www"));
+  });
+
+  it("finds current .flisk projects next to legacy .tdk ones and reads their names", () => {
+    const root = mkdtempSync(join(tmpdir(), "flisk-app-scan-"));
+    tempDirs.push(root);
+    const current = join(root, "current");
+    mkdirSync(join(current, ".flisk"), { recursive: true });
+    writeFileSync(join(current, ".flisk", "project.json"), JSON.stringify({ project: { name: "current-shop" } }));
+    const legacy = join(root, "legacy");
+    mkdirSync(join(legacy, ".tdk"), { recursive: true });
+    writeFileSync(join(legacy, ".tdk", "project.json"), JSON.stringify({ project: { name: "legacy-shop" } }));
+
+    const projects = discoverProjects({ currentRoot: null, scanRoots: [root] });
+    assert.deepEqual(projects.map((entry) => [entry.name, entry.root]), [["current-shop", current], ["legacy-shop", legacy]]);
+    const nested = join(current, "services", "api");
+    mkdirSync(nested, { recursive: true });
+    assert.equal(discoverProjectRoot(nested), current);
+    assert.equal(projectFile(current), join(current, ".flisk", "project.json"));
+    assert.equal(projectFile(join(root, "missing")), null);
+  });
+
+  it("registers a .flisk project through Open project", async () => {
+    const root = mkdtempSync(join(tmpdir(), "fliskos-open-test-"));
+    tempDirs.push(root);
+    mkdirSync(join(root, ".flisk"), { recursive: true });
+    writeFileSync(join(root, ".flisk", "project.json"), JSON.stringify({ project: { name: "opened" } }));
+    const { server } = await serverFor({ projects: [], probe: async () => supported, runCommand: async () => ({ status: 0, stdout: "{}", stderr: "" }) });
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/projects/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-flisk-token": "test-session-token", origin: `http://127.0.0.1:${server.address().port}` },
+      body: JSON.stringify({ path: root }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.project.name, "opened");
   });
 
   it("reaches shallow projects before a large sibling tree exhausts the directory cap", () => {

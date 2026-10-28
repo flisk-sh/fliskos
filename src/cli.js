@@ -37,7 +37,7 @@ process.stderr.on("error", () => {});
 try {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log("Usage: flisk-app [--project <path> ...] [--scan-root <path> ...] [--no-scan] [--no-open] [--port <port>]");
+    console.log("Usage: fliskos [--project <path> ...] [--scan-root <path> ...] [--no-scan] [--no-open] [--port <port>]");
     process.exit(0);
   }
   // Listen first and scan afterwards so the window and its loader appear immediately.
@@ -51,9 +51,9 @@ try {
   let markReady;
   const projectsReady = new Promise((resolve) => { markReady = resolve; });
   if (projects.length) markReady();
-  const { server, url } = await startAppServer({ projects, projectsReady, port: options.port, prewarm: true, statePath });
+  const { server, url, agents } = await startAppServer({ projects, projectsReady, port: options.port, prewarm: true, statePath });
   if (options.open) openBrowser(url).catch(() => {});
-  console.log(`Flisk App is running at ${url}`);
+  console.log(`FliskOS is running at ${url}`);
   setTimeout(() => {
     try {
       const found = discoverProjects({
@@ -74,7 +74,11 @@ try {
     console.log(`Found ${projects.length} Flisk project${projects.length === 1 ? "" : "s"}.`);
   }, 250);
   console.log("Press Ctrl+C to close the local command center.");
-  const shutdown = () => server.close(() => process.exit(0));
+  // Stop working agents first: server.close waits for open browser connections before it calls back.
+  const shutdown = () => {
+    agents.shutdown();
+    server.close(() => process.exit(0));
+  };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
   if (!options.open) process.stdin.on("end", shutdown).resume();

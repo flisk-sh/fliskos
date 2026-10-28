@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
     <meta name="flisk-token" content="__FLISK_CENTER_TOKEN__" />
-    <meta name="description" content="Local project dashboard for Flisk" />
-    <title>Flisk App</title>
+    <meta name="description" content="FliskOS: your Flisk projects, your coding agents and the Flisk apps in one local window" />
+    <title>FliskOS</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -956,17 +956,97 @@
 
       /* Keyboard focus ring for buttons whose own rules above reset box-shadow (the Start/Stop/Restart capsule, primary and quiet buttons). */
       .row-actions .button:focus-visible, .button.primary:focus-visible, .button.quiet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+      /* ===== Agents: thread list on the left, the open thread or a new one on the right ===== */
+      .agent-providers { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+      .provider-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--label); font-size: 13px; }
+      .provider-chip small { color: var(--secondary); font-size: 12px; }
+      .provider-chip.missing { color: var(--secondary); border-style: dashed; }
+      .provider-chip a { color: var(--accent); text-decoration: none; font-size: 12px; }
+      .agents-layout { display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); gap: 18px; align-items: start; }
+      .thread-list { display: grid; gap: 2px; max-height: calc(100vh - 230px); overflow: auto; }
+      .thread-item { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--secondary); text-align: left; }
+      .thread-item:hover { background: var(--surface-alt); color: var(--label); }
+      .thread-item.active { background: var(--surface); color: var(--label); box-shadow: 0 0 0 1px var(--line); }
+      .thread-item .state-dot { margin-top: 6px; }
+      .thread-item-copy { display: grid; gap: 2px; min-width: 0; }
+      .thread-item-title { font-size: 14px; font-weight: 500; color: var(--label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .thread-item-meta { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .thread-empty { padding: 12px 10px; color: var(--secondary); font-size: 13px; }
+      .thread-pane { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+      .thread-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+      .thread-head h2 { margin: 0; font: 600 16px/1.35 var(--sans); overflow-wrap: anywhere; }
+      .thread-meta { margin-top: 4px; color: var(--secondary); font-size: 13px; }
+      .thread-meta .link-btn { height: auto; padding: 0; font-size: 13px; }
+      .thread-actions { display: flex; gap: 6px; flex: none; }
+      .transcript { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; max-height: calc(100vh - 330px); min-height: 160px; overflow: auto; }
+      .transcript > * { min-width: 0; }
+      .msg { font: 400 14px/1.55 var(--sans); color: var(--label); overflow-wrap: anywhere; }
+      .msg.user { justify-self: end; max-width: 85%; display: grid; justify-items: end; gap: 4px; }
+      .msg.user .bubble { padding: 9px 12px; border-radius: 12px; background: var(--accent-wash); white-space: pre-wrap; }
+      .msg.agent pre, .agent-tool pre, .agent-thinking pre, .agent-plan pre { margin: 6px 0 0; padding: 9px 11px; border-radius: 8px; background: var(--surface-alt); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow: auto; }
+      .msg.agent code { font: 12.5px var(--mono); padding: 1px 4px; border-radius: 4px; background: var(--surface-alt); }
+      .msg.agent pre code { padding: 0; background: none; }
+      .stack-chip { font-size: 11px; color: var(--secondary); }
+      .agent-tool, .agent-thinking { border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface-alt); font-size: 13px; }
+      .agent-tool summary, .agent-tool-line, .agent-thinking summary { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: default; list-style: none; }
+      .agent-tool summary::-webkit-details-marker, .agent-thinking summary::-webkit-details-marker { display: none; }
+      .agent-tool summary, .agent-thinking summary { cursor: pointer; }
+      .agent-tool pre, .agent-thinking pre { margin: 0 10px 10px; background: var(--surface); }
+      .agent-tool-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+      .agent-tool-status { flex: none; color: var(--secondary); font-size: 12px; }
+      .agent-tool.refused .agent-tool-status, .agent-tool.failed .agent-tool-status { color: var(--red); }
+      .agent-thinking summary { color: var(--secondary); }
+      .agent-status { color: var(--secondary); font-size: 12px; }
+      .turn-foot { display: flex; align-items: center; gap: 8px; color: var(--secondary); font-size: 12px; }
+      .turn-error { padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--red) 35%, var(--line)); border-radius: 8px; background: var(--red-wash); color: var(--red); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .working-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); animation: agent-pulse 1.2s ease-in-out infinite; }
+      @keyframes agent-pulse { 50% { opacity: .3; } }
+      @media (prefers-reduced-motion: reduce) { .working-dot { animation: none; } }
+      .composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+      .composer textarea, .agent-form textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 64px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--label); font: 400 14px/1.5 var(--sans); }
+      .composer textarea:focus, .agent-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .agent-form { display: grid; gap: 14px; padding: 16px; }
+      .agent-form h2 { margin: 0; font: 600 16px var(--sans); }
+      .agent-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+      .mode-switch { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-alt); }
+      .mode-switch label { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 6px; color: var(--secondary); font: 500 13px var(--sans); cursor: pointer; }
+      .mode-switch input { position: absolute; opacity: 0; pointer-events: none; }
+      .mode-switch label:has(input:checked) { background: var(--surface); color: var(--label); box-shadow: 0 0 0 1px var(--line); }
+      .mode-switch label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .mode-note { margin: -4px 0 0; color: var(--secondary); font-size: 13px; }
+      .agent-form-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+      .agent-form-foot .check { display: inline-flex; align-items: center; gap: 7px; color: var(--secondary); font-size: 13px; }
+      .agent-form-foot .spacer { flex: 1; }
+      .shortcut-note { color: var(--tertiary); font-size: 12px; }
+      @media (max-width: 840px) {
+        .agents-layout { grid-template-columns: 1fr; }
+        .thread-list { max-height: 220px; }
+        .transcript { max-height: none; }
+      }
+
+      /* ===== Apps: the other Flisk tools, pointed at one project ===== */
+      .apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+      .app-card { display: grid; align-content: start; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+      .app-card h3 { margin: 0; font: 600 15px var(--sans); }
+      .app-card .app-host { color: var(--tertiary); font: 12px var(--mono); }
+      .app-card p { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.5; }
+      .app-card .app-note { color: var(--tertiary); font-size: 12px; }
+      .app-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+      .app-actions a.button { text-decoration: none; }
+      .apps-project { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; }
+      .apps-project .field { grid-auto-flow: column; align-items: center; }
     </style>
   </head>
   <body>
     <div class="app">
       <button id="side-toggle" class="side-toggle" type="button" aria-label="Toggle sidebar (Cmd+B)" aria-expanded="true" aria-controls="sidebar" title="Toggle sidebar (⌘B)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M8 3.5v13" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <aside id="sidebar" class="sidebar" aria-label="Project navigation">
-        <div class="brand"><span class="brand-mark">F</span><span class="brand-name">Flisk App</span><span class="local-mark" title="Local session"></span></div>
+        <div class="brand"><span class="brand-mark">F</span><span class="brand-name">FliskOS</span><span class="local-mark" title="Local session"></span></div>
         <div class="sidebar-tools">
           <label class="search"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.8" stroke="currentColor" stroke-width="1.5"/><path d="m13.2 13.2 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input id="search" type="search" title="Filter projects (/ or Ctrl/Cmd+F)" placeholder="Filter projects" aria-label="Filter projects" autocomplete="off" /></label>
         </div>
-        <nav class="side-nav"><button id="overview-nav" class="nav-item active" type="button" title="Overview"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/><rect x="11.3" y="2.5" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/><rect x="2.5" y="11.3" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/><rect x="11.3" y="11.3" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/></svg><span class="nav-label">Overview</span><span id="nav-count" class="count">—</span></button><button id="new-project-nav" class="nav-item" type="button" title="New project"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="nav-label">New project</span></button><button id="open-project-nav" class="nav-item" type="button" title="Open project"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 6.2c0-.9.7-1.6 1.6-1.6h3.3l1.6 1.8h5c.9 0 1.5.7 1.5 1.6v6c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V6.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="nav-label">Open project</span></button></nav>
+        <nav class="side-nav"><button id="overview-nav" class="nav-item active" type="button" title="Overview"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/><rect x="11.3" y="2.5" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/><rect x="2.5" y="11.3" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/><rect x="11.3" y="11.3" width="6.2" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.4"/></svg><span class="nav-label">Overview</span><span id="nav-count" class="count">—</span></button><button id="agents-nav" class="nav-item" type="button" title="Agents"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 16 14H9l-4 3v-3H4a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 4 4.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 8.2h7M6.5 10.6h4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span class="nav-label">Agents</span><span id="agents-count" class="count"></span></button><button id="apps-nav" class="nav-item" type="button" title="Apps"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="5.8" cy="5.8" r="2.3" stroke="currentColor" stroke-width="1.4"/><circle cx="14.2" cy="5.8" r="2.3" stroke="currentColor" stroke-width="1.4"/><circle cx="5.8" cy="14.2" r="2.3" stroke="currentColor" stroke-width="1.4"/><circle cx="14.2" cy="14.2" r="2.3" stroke="currentColor" stroke-width="1.4"/></svg><span class="nav-label">Apps</span></button><button id="new-project-nav" class="nav-item" type="button" title="New project"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="nav-label">New project</span></button><button id="open-project-nav" class="nav-item" type="button" title="Open project"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 6.2c0-.9.7-1.6 1.6-1.6h3.3l1.6 1.8h5c.9 0 1.5.7 1.5 1.6v6c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V6.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="nav-label">Open project</span></button></nav>
         <button id="ws-toggle" class="section-title section-toggle" type="button" aria-expanded="true"><svg class="chevron" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Projects <span id="side-count" class="count">—</span></button>
         <div id="project-list" class="project-list"><div class="skel-side" aria-label="Finding projects"><i></i><i></i><i></i><i></i></div></div>
         <div class="sidebar-foot">Local projects · refreshes every 7 seconds</div>
@@ -977,8 +1057,9 @@
       </section>
     </div>
     <dialog class="modal form-modal" id="form-dialog" aria-labelledby="form-title"></dialog>
-    <dialog class="modal" id="logs" aria-labelledby="log-title"><div class="modal-head"><h2 id="log-title">Recent logs</h2><div class="modal-actions"><button class="copy-icon" id="copy-logs" type="button" aria-label="Copy logs" title="Copy logs"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="6" width="9" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M12.5 4H5.8A1.8 1.8 0 0 0 4 5.8v8.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button><button class="button quiet" id="close-logs" type="button">Close</button></div></div><div id="log-ai"></div><pre id="log-body">Loading…</pre></dialog>
+    <dialog class="modal" id="logs" aria-labelledby="log-title"><div class="modal-head"><h2 id="log-title">Recent logs</h2><div class="modal-actions"><button class="copy-icon" id="copy-logs" type="button" aria-label="Copy logs" title="Copy logs"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="6" width="9" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M12.5 4H5.8A1.8 1.8 0 0 0 4 5.8v8.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button><button class="button" id="ask-agent-logs" type="button" title="Start an agent thread with these logs">Ask an agent</button><button class="button quiet" id="close-logs" type="button">Close</button></div></div><div id="log-ai"></div><pre id="log-body">Loading…</pre></dialog>
     <script src="/inspect.js" defer></script>
     <script src="/app.js" defer></script>
+    <script src="/os.js" defer></script>
   </body>
 </html>

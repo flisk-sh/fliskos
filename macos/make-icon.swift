@@ -1,6 +1,6 @@
 import AppKit
 
-// Draws the Flisk App icon at 1024px and writes an .iconset for iconutil.
+// Draws the FliskOS icon at 1024px and writes an .iconset for iconutil.
 let size: CGFloat = 1024
 func render(_ px: Int) -> Data {
     let s = CGFloat(px)
