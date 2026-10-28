@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { commonProjectScanRoots, defaultStatePath, discoverProjectRoot, discoverProjects, openBrowser, readAppState, resolveProjects, startAppServer, writeAppState } from "./app.js";
+import { defaultStatePath, discoverProjectRoot, discoverProjects, openBrowser, readAppState, resolveProjects, startAppServer, startupScanRoots, writeAppState } from "./app.js";
 
 function parseArgs(args) {
   const options = { projects: [], scanRoots: [], port: 0, scan: true, open: true };
@@ -59,7 +59,7 @@ try {
       const found = discoverProjects({
         currentRoot: discoverProjectRoot(),
         projectRoots: options.projects,
-        scanRoots: [...(options.scan ? commonProjectScanRoots() : []), ...options.scanRoots],
+        scanRoots: startupScanRoots({ scan: options.scan, extra: options.scanRoots, state: readAppState(statePath) }),
       });
       for (const project of found) if (!projects.some((entry) => entry.root === project.root)) projects.push(project);
       if (options.scan) {

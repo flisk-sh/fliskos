@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { TOOL_COMMANDS, cliBinaryCandidates, commonProjectScanRoots, discoverProjectRoot, discoverProjects, findClaudeDesktopApp, normalizeState, probeCli, projectFile, resolveProjects, resolveTdkBinary, startAppServer } from "../src/app.js";
+import { TOOL_COMMANDS, cliBinaryCandidates, commonProjectScanRoots, discoverProjectRoot, discoverProjects, findClaudeDesktopApp, normalizeState, probeCli, projectFile, resolveProjects, resolveTdkBinary, startAppServer, startupScanRoots } from "../src/app.js";
 
 const servers = [];
 const tempDirs = [];
@@ -437,6 +437,91 @@ describe("persistent UI state", () => {
   it("keeps closed stacks across launches", () => {
     const state = normalizeState({ closedStacks: ["proj/core", 42, "proj/jobs"] });
     assert.deepEqual(state.closedStacks, ["proj/core", "proj/jobs"]);
+  });
+});
+
+describe("scan folders", () => {
+  function folderOfProjects() {
+    const folder = mkdtempSync(join(tmpdir(), "fliskos-scan-folder-"));
+    tempDirs.push(folder);
+    for (const name of ["shop", "blog"]) {
+      mkdirSync(join(folder, name, ".flisk"), { recursive: true });
+      writeFileSync(join(folder, name, ".flisk", "project.json"), JSON.stringify({ project: { name } }));
+    }
+    return realpathSync(folder);
+  }
+
+  async function serve(statePath, projects = []) {
+    const { server } = await serverFor({ projects, statePath, probe: async () => supported, runCommand: async () => ({ status: 1, stdout: "", stderr: "" }) });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    return async (path, body, method = body ? "POST" : "GET") => {
+      const response = await fetch(`${base}${path}`, { method, headers: { "content-type": "application/json", "x-flisk-token": "test-session-token", origin: base }, body: body ? JSON.stringify(body) : undefined });
+      return { status: response.status, body: await response.json() };
+    };
+  }
+
+  it("keeps saved scan folders in the state file, up to twenty", () => {
+    const many = Array.from({ length: 30 }, (_, index) => `/code/${index}`);
+    assert.deepEqual(normalizeState({ scanRoots: ["/a", 1, "/a", "/b"] }).scanRoots, ["/a", "/b"]);
+    assert.equal(normalizeState({ scanRoots: many }).scanRoots.length, 20);
+    assert.deepEqual(normalizeState(null).scanRoots, []);
+  });
+
+  it("scans the common folders and the saved ones at startup, and only --scan-root with --no-scan", () => {
+    const state = normalizeState({ scanRoots: ["/Users/example/tdk-pr-work"] });
+    const roots = startupScanRoots({ scan: true, extra: ["/extra"], state, home: "/Users/example" });
+    assert(roots.includes("/Users/example/src"));
+    assert.deepEqual(roots.slice(-2), ["/Users/example/tdk-pr-work", "/extra"]);
+    assert.deepEqual(startupScanRoots({ scan: false, extra: ["/extra"], state, home: "/Users/example" }), ["/extra"]);
+  });
+
+  it("saves a folder of projects through Open project, lists them, and stops scanning it on request", async () => {
+    const folder = folderOfProjects();
+    const statePath = join(mkdtempSync(join(tmpdir(), "fliskos-scan-state-")), "state.json");
+    tempDirs.push(dirname(statePath));
+    const call = await serve(statePath);
+
+    const added = await call("/api/projects/add", { path: folder });
+    assert.equal(added.status, 200);
+    assert.deepEqual(added.body.scanFolder, { path: folder, found: 2, added: 2 });
+    assert.deepEqual(added.body.projects.map((project) => project.name), ["blog", "shop"]);
+    const saved = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.deepEqual(saved.scanRoots, [folder]);
+    assert.deepEqual(saved.knownRoots, [join(folder, "blog"), join(folder, "shop")]);
+    assert.deepEqual((await call("/api/state")).body.scanRoots, [folder]);
+    assert.equal((await call("/api/meta")).body.roots[0], folder);
+
+    const again = await call("/api/projects/add", { path: folder });
+    assert.deepEqual(again.body.scanFolder, { path: folder, found: 2, added: 0 });
+    assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")).scanRoots, [folder]);
+
+    // The page saves its own state with PUT; that must not drop or replace the scan folders.
+    await call("/api/state", { pins: { projects: ["p1"], resources: [] }, scanRoots: [], knownRoots: [] }, "PUT");
+    const afterPut = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.deepEqual(afterPut.scanRoots, [folder]);
+    assert.equal(afterPut.knownRoots.length, 2);
+    assert.deepEqual(afterPut.pins.projects, ["p1"]);
+
+    assert.deepEqual(await call("/api/scan-folders/remove", { path: folder }), { status: 200, body: { ok: true, scanRoots: [] } });
+    assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")).scanRoots, []);
+    assert.equal(JSON.parse(readFileSync(statePath, "utf8")).knownRoots.length, 2, "projects already listed stay");
+    assert.equal((await call("/api/scan-folders/remove", { path: folder })).status, 404);
+  });
+
+  it("still opens a single project, and refuses a folder with no project in or below it", async () => {
+    const folder = folderOfProjects();
+    const call = await serve(null);
+    const single = await call("/api/projects/add", { path: join(folder, "shop") });
+    assert.equal(single.status, 200);
+    assert.equal(single.body.project.name, "shop");
+    assert.equal(single.body.scanFolder, undefined);
+    assert.equal((await call("/api/state")).body.scanRoots.length, 0);
+    const empty = mkdtempSync(join(tmpdir(), "fliskos-empty-"));
+    tempDirs.push(empty);
+    const refused = await call("/api/projects/add", { path: empty });
+    assert.equal(refused.status, 400);
+    assert.match(refused.body.error, /No Flisk project in that folder or below it/);
+    assert.equal((await call("/api/scan-folders/remove", { path: "" })).status, 400);
   });
 });
 

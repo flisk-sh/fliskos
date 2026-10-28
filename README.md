@@ -89,7 +89,9 @@ npm start -- --port 43120
 bun src/cli.js          # the same server under Bun (npm run start:bun)
 ```
 
-FliskOS automatically searches common development locations, including `/var/www`, `~/ollama`, `~/Codex`, `~/Documents/Codex`, `~/GitHub`, `~/Documents/GitHub`, `~/src`, `~/Projects`, and `~/Developer`. It also includes the project containing the current directory. Scans are bounded to eight directory levels and skip dependency, build, and version-control folders. Use repeatable `--scan-root` options to add locations, `--project` to add a specific project root, or `--no-scan` to disable the common-location scan. Every selected project must contain `.flisk/project.json` (projects made before the CLI rename have `.tdk/project.json`, which is still found).
+FliskOS automatically searches common development locations, including `/var/www`, `~/ollama`, `~/Codex`, `~/Documents/Codex`, `~/GitHub`, `~/Documents/GitHub`, `~/src`, `~/Projects`, and `~/Developer`. It also includes the project containing the current directory. Scans are bounded to eight directory levels and skip dependency, build, and version-control folders. Use repeatable `--scan-root` options to add locations, `--project` to add a specific project root, or `--no-scan` to scan only what the command line names (no common folders, saved scan folders or known projects). Every selected project must contain `.flisk/project.json` (projects made before the CLI rename have `.tdk/project.json`, which is still found).
+
+**Open project** takes either one project or a folder of projects (such as `~/code`). A folder of projects is saved as a scan folder and scanned again at every start, so new projects in it show up by themselves; this is how the macOS app, which takes no options, learns about folders outside the common ones. The overview lists the saved folders with **Stop** next to each; stopping keeps the projects already in the list. Up to 20 folders can be saved.
 
 `--port 0` (the default) selects an available local port.
 

@@ -138,6 +138,8 @@ const pinnedProjects = new Set();
 const pinnedResources = new Set();
 // "Inspect with AI" buttons are off until the user switches them on in the Recent logs dialog.
 let aiInspect = false;
+// Folders of projects added with Open project, scanned at every start (paths arrive with the home folder as ~).
+let scanFolders = [];
 let logView = null; // the logs dialog's current resource and lines
 let stateLoaded = false;
 let saveTimer = null;
@@ -158,6 +160,7 @@ async function loadState() {
     for (const id of state.pins?.projects || []) pinnedProjects.add(id);
     for (const key of state.pins?.resources || []) pinnedResources.add(key);
     aiInspect = state.aiInspect === true;
+    scanFolders = state.scanRoots || [];
   } catch {}
   stateLoaded = true;
   applySidebarState();
@@ -273,7 +276,7 @@ function renderOverview() {
   }).join("");
 
   content.innerHTML = `<div class="content-inner">
-    <div class="page-head"><div><h1>Projects</h1><p>${projects.length} local workspace${projects.length === 1 ? "" : "s"} discovered across your development folders.</p>${hiddenCount ? `<div class="hidden-note">${hiddenCount} hidden · <button type="button" data-action="toggle-hidden">${showHidden ? "Hide them again" : "Show them"}</button></div>` : ""}</div>
+    <div class="page-head"><div><h1>Projects</h1><p>${projects.length} local workspace${projects.length === 1 ? "" : "s"} discovered across your development folders.</p>${hiddenCount ? `<div class="hidden-note">${hiddenCount} hidden · <button type="button" data-action="toggle-hidden">${showHidden ? "Hide them again" : "Show them"}</button></div>` : ""}${scanFolders.map((folder) => `<div class="hidden-note">Also scanning <code>${esc(folder)}</code> · <button type="button" data-action="forget-scan-folder" data-path="${esc(folder)}">Stop</button></div>`).join("")}</div>
       <div class="head-actions"><button class="button" type="button" data-action="build-with-ai">${btnIcon("sparkle")}Build with AI</button><button class="button" type="button" data-action="open-existing-project">${btnIcon("folder")}Open project</button><button class="button primary" type="button" data-action="new-project">${btnIcon("plus")}New project</button></div></div>
     <div class="narrow-search"><input id="content-search" type="search" title="Filter projects (/ or Ctrl/Cmd+F)" placeholder="Filter projects" aria-label="Filter projects" value="${esc(searchTerm)}" autocomplete="off"></div>
     ${collapsible("summary", "Summary", `<div class="gauges">${overviewGauges(ready, resources)}</div>${tokenBarMarkup(sumTokens(projects.map((project) => project.tokens)), "Generated share (est.)")}`)}
@@ -1072,6 +1075,17 @@ const post = (url, body) => api(url, { method: "POST", body: JSON.stringify(body
 async function handleCrud(action, projectId, name, dataset) {
   const project = projects.find((entry) => entry.id === projectId);
   if (action === "toggle-hidden") { showHidden = !showHidden; render(); return true; }
+  if (action === "forget-scan-folder") {
+    if (!window.confirm(`Stop scanning ${dataset.path}? Projects already in the list stay; new ones there will need Open project.`)) return true;
+    try {
+      scanFolders = (await post("/api/scan-folders/remove", { path: dataset.path })).scanRoots || [];
+      showNotice(`FliskOS no longer scans ${dataset.path}.`);
+    } catch (error) {
+      showNotice(error.message, true);
+    }
+    render();
+    return true;
+  }
   if (action === "pin-project" && projectId) {
     if (pinnedProjects.has(projectId)) pinnedProjects.delete(projectId); else pinnedProjects.add(projectId);
     saveState();
@@ -1172,13 +1186,18 @@ async function openExistingProject() {
   const info = await loadMeta();
   openForm({
     title: "Open project",
-    intro: "Adds an existing Flisk project (a folder that contains .flisk/project.json) to the dashboard.",
-    fields: [{ name: "path", label: "Project folder", value: "", placeholder: `${info.defaultParent}/my-shop`, list: info.roots, hint: "The folder that contains .flisk. ~ means your home folder." }],
-    submit: "Open project",
-    validate: (v) => (v.path ? "" : "Enter the project folder."),
+    intro: "Adds an existing Flisk project (a folder that contains .flisk/project.json), or a folder of projects such as ~/code. A folder of projects is scanned again every time FliskOS starts, so new projects in it show up by themselves.",
+    fields: [{ name: "path", label: "Folder", value: "", placeholder: `${info.defaultParent}/my-shop`, list: info.roots, hint: "A project folder, or a folder with projects inside. ~ means your home folder." }],
+    submit: "Open",
+    validate: (v) => (v.path ? "" : "Enter a folder."),
     run: async (v) => {
       const result = await post("/api/projects/add", { path: v.path });
-      if (result.ok && result.project) {
+      if (result.ok && result.scanFolder) {
+        scanFolders = result.scanRoots || scanFolders;
+        const { found, added } = result.scanFolder;
+        result.output = `Found ${found} project${found === 1 ? "" : "s"} (${added} new). FliskOS now scans this folder at every start.`;
+        await refreshData();
+      } else if (result.ok && result.project) {
         selectedProjectId = result.project.id;
         result.output = result.alreadyListed ? `${result.project.name} is already in the list.` : `Added ${result.project.name}.`;
       }
