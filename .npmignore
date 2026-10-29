@@ -1,4 +1,4 @@
-# The README demo video and its poster are for GitHub. Keep them out of the npm package.
+# The README demo loop is for GitHub. Keep it out of the npm package.
 docs/media/
 
 # npm ignores .gitignore once this file exists, so repeat its entries.
