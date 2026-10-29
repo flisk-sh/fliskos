@@ -6,6 +6,10 @@ FliskOS is one local window for everything Flisk: your projects and their stacks
 - **Agents.** Run Claude Code, Codex, Cursor Agent, Grok Build or fx inside a project, follow what they do, and reply in the same thread, the way [T3 Code](https://github.com/pingdotgg/t3code) does. Each agent runs on the login you already have for it.
 - **Apps.** Pages, Citable, Helpdock, Command Comparer, the DevEx Roadmap and Demos, each pointed at the project you pick.
 
+[![FliskOS in 51 seconds: a running agent stack, the project overview and a Claude Code thread. Click to play.](docs/media/fliskos-demo.jpg)](docs/media/fliskos-demo.mp4)
+
+Click to play the 51-second demo. Every screen is a real capture of FliskOS running a demo agent stack (`flisk project agent-stack`, then `flisk up agents`).
+
 > Renamed from Flisk App (and TDK App before that). The macOS bundle is now `FliskOS.app`, the npm package `@flisk-sh/fliskos` and the command `fliskos` (`flisk-app` still works). The installer removes the old `Flisk App.app` and `TDK App.app`, and the old state file is read once so pins, hidden projects and known roots survive.
 
 ## Projects
