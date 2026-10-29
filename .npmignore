@@ -1,0 +1,8 @@
+# The README demo loop is for GitHub. Keep it out of the npm package.
+docs/media/
+
+# npm ignores .gitignore once this file exists, so repeat its entries.
+node_modules/
+.DS_Store
+npm-debug.log*
+dist/
