@@ -774,7 +774,77 @@ export function stackContext(project, snapshot) {
 const agentPrompt = (value) => (typeof value === "string" && value.trim() && value.length <= AGENT_PROMPT_LIMIT ? value.trim() : null);
 const PROMPT_ERROR = `Write a prompt of up to ${AGENT_PROMPT_LIMIT.toLocaleString("en-US")} characters.`;
 
-export function startAppServer({ projects, projectsReady = Promise.resolve(), probe = probeCli, host = "127.0.0.1", port = 0, token = randomBytes(32).toString("hex"), runCommand = runTdk, openPath = openProjectPath, claudeDesktopApp = findClaudeDesktopApp, openAiApp = openInClaudeApp, dockerCheck = checkDocker, dockerRestart = restartContainerRuntime, prewarm = false, statePath = null, agents = null }) {
+export const BOARD_URL = "http://127.0.0.1:4100";
+export const BOARD_HEALTH_TIMEOUT_MS = 500;
+export const BOARD_SESSIONS_TIMEOUT_MS = 1000;
+
+export async function probeBoardHealth(url = BOARD_URL, timeoutMs = BOARD_HEALTH_TIMEOUT_MS, fetchImpl = fetch) {
+  try {
+    const res = await fetchImpl(`${url}/health`, {
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return false;
+    const body = await res.json().catch(() => null);
+    return body?.status === "ok" && body?.service === "board";
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchBoardSessions(url = BOARD_URL, timeoutMs = BOARD_SESSIONS_TIMEOUT_MS, fetchImpl = fetch) {
+  try {
+    const res = await fetchImpl(`${url}/api/sessions`, {
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    if (!data || !Array.isArray(data.sessions)) return [];
+    return data.sessions
+      .filter((s) => s && typeof s.id === "string")
+      .map((s) => ({
+        id: s.id,
+        agent: typeof s.agent === "string" ? s.agent : "unknown",
+        cwd: typeof s.cwd === "string" ? s.cwd : "",
+        title: typeof s.title === "string" ? s.title : "Untitled Session",
+        status: typeof s.status === "string" ? s.status : "unknown",
+        role: typeof s.role === "string" ? s.role : undefined,
+        face: s.face && typeof s.face === "object" ? s.face : undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export function canonicalPath(p) {
+  if (!p) return "";
+  const resolved = resolve(p);
+  try {
+    return realpathSync(resolved).replace(/\\/g, "/").replace(/\/+$/, "");
+  } catch {
+    let current = resolved;
+    const parts = [];
+    while (current !== dirname(current)) {
+      parts.unshift(basename(current));
+      current = dirname(current);
+      try {
+        const realParent = realpathSync(current);
+        return join(realParent, ...parts).replace(/\\/g, "/").replace(/\/+$/, "");
+      } catch {}
+    }
+    return resolved.replace(/\\/g, "/").replace(/\/+$/, "");
+  }
+}
+
+export function isSessionInsideProject(sessionCwd, projectPath) {
+  if (!sessionCwd || !projectPath) return false;
+  const normProject = canonicalPath(projectPath);
+  const normSession = canonicalPath(sessionCwd);
+  return normSession === normProject || normSession.startsWith(`${normProject}/`);
+}
+
+export function startAppServer({ projects, projectsReady = Promise.resolve(), probe = probeCli, host = "127.0.0.1", port = 0, token = randomBytes(32).toString("hex"), runCommand = runTdk, openPath = openProjectPath, claudeDesktopApp = findClaudeDesktopApp, openAiApp = openInClaudeApp, dockerCheck = checkDocker, dockerRestart = restartContainerRuntime, prewarm = false, statePath = null, agents = null, fetchImpl = fetch }) {
   if (host !== "127.0.0.1") throw new Error("FliskOS can only bind to 127.0.0.1.");
   // Threads are kept next to the state file, so they survive a restart; without a state file they live in memory.
   const hub = agents ?? createAgentHub({ dir: statePath ? join(dirname(statePath), "threads") : null, appVersion: APP_VERSION });
@@ -1328,6 +1398,27 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
       if (url.pathname === "/api/agents/thread/delete" && request.method === "POST") {
         const body = await readBody(request);
         return sendJson(response, 200, hub.remove(String(body.id ?? "")));
+      }
+      if (url.pathname === "/api/agents/board" && request.method === "GET") {
+        const id = url.searchParams.get("project");
+        const project = id ? projects.find((entry) => entry.id === id) : null;
+        if (id && !project) return sendJson(response, 400, { error: "Select a project." });
+
+        const isUp = await probeBoardHealth(BOARD_URL, BOARD_HEALTH_TIMEOUT_MS, fetchImpl);
+        if (!isUp) {
+          return sendJson(response, 200, { state: "not-running", boardUrl: "http://localhost:4100", sessions: [] });
+        }
+
+        const allSessions = await fetchBoardSessions(BOARD_URL, BOARD_SESSIONS_TIMEOUT_MS, fetchImpl);
+        const sessions = project
+          ? allSessions.filter((s) => isSessionInsideProject(s.cwd, project.root))
+          : allSessions;
+
+        return sendJson(response, 200, {
+          state: "running",
+          boardUrl: "http://localhost:4100",
+          sessions,
+        });
       }
       if (url.pathname === "/api/apps" && request.method === "GET") {
         const id = url.searchParams.get("project");

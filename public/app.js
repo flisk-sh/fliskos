@@ -340,6 +340,7 @@ function renderDetail(project) {
     ${doctorSection(project)}
     ${configSection(project)}
     ${toolsSection(project)}
+    ${agentsSection(project)}
     ${collapsible("stacks", "Stacks & resources", `<div class="stack-list">${project.pending ? `<div class="skel-row"></div><div class="skel-row"></div>` : stackMarkup || `<div class="empty"><span class="empty-icon" aria-hidden="true">F</span><strong>No resources found</strong><p>Initialize this folder with the Flisk CLI to add resources.</p></div>`}</div>`, `${resources.length} total <span class="scope-note">Stop and Restart act on the whole project</span><button class="link-btn" type="button" data-action="new-stack" data-project="${esc(project.id)}">${btnIcon("stack")}New stack</button><button class="link-btn" type="button" data-action="new-resource" data-project="${esc(project.id)}">${btnIcon("plus")}Add resource</button>`)}
   </div>`;
 }
@@ -478,6 +479,76 @@ async function loadDoctors(force = false) {
   }
 }
 
+const agentBoards = new Map();
+let agentBoardRunning = false;
+const AGENT_BOARD_RETRY_MS = 30_000;
+
+async function loadAgentBoards(force = false) {
+  if (agentBoardRunning) return;
+  agentBoardRunning = true;
+  try {
+    for (const project of projects) {
+      const prev = agentBoards.get(project.id);
+      if (!force && prev && Date.now() - prev.at < AGENT_BOARD_RETRY_MS) continue;
+      try {
+        const data = await api(`/api/agents/board?project=${encodeURIComponent(project.id)}`);
+        agentBoards.set(project.id, { ...data, at: Date.now() });
+      } catch (err) {
+        agentBoards.set(project.id, { state: "not-running", boardUrl: "http://localhost:4100", sessions: [], at: Date.now() });
+      }
+      if (selectedProjectId === project.id) render();
+    }
+  } finally {
+    agentBoardRunning = false;
+  }
+}
+
+function agentsSection(project) {
+  const data = agentBoards.get(project.id);
+  const openLink = `<a class="link-btn" href="http://localhost:4100" target="_blank" rel="noreferrer">${btnIcon("open-project")}Open Run My Agents</a>`;
+  if (!data) {
+    return collapsible("agents-board", "Coding agents", `<div class="doctor-box">Checking Run My Agents (port 4100)…</div>`, openLink);
+  }
+  if (data.state === "not-running") {
+    return collapsible(
+      "agents-board",
+      "Coding agents",
+      `<div class="empty"><span class="empty-icon" aria-hidden="true">A</span><strong>Run My Agents is not running on port 4100</strong><p>Start the board with <code>flisk up</code> in run-my-agents or launch the Mac app to see active Claude Code and Codex sessions for this project.</p></div>`,
+      openLink
+    );
+  }
+  const sessions = data.sessions || [];
+  if (!sessions.length) {
+    return collapsible(
+      "agents-board",
+      "Coding agents",
+      `<div class="empty"><span class="empty-icon" aria-hidden="true">A</span><strong>No agent sessions recorded in this project yet</strong><p>Run Claude Code or Codex inside this project folder to see live sessions here.</p></div>`,
+      openLink
+    );
+  }
+  const list = sessions.map((s) => `
+    <div class="resource-row">
+      <div class="resource-name" title="${esc(s.title)}">
+        <i class="state-dot ${s.status === "busy" ? "running" : "ready"} row-dot"></i>
+        ${esc(s.title)}
+        <span class="resource-type">${esc(s.agent)}${s.role ? ` · ${esc(s.role)}` : ""}</span>
+      </div>
+      <span class="status-chip ${s.status === "busy" ? "running" : "ready"}">${esc(s.status)}</span>
+      <span class="resource-url" title="${esc(s.cwd)}">${esc(s.cwd)}</span>
+      <div class="resource-actions">
+        <a class="button quiet" href="http://localhost:4100" target="_blank" rel="noreferrer" title="Open session in Run My Agents">Open</a>
+      </div>
+    </div>
+  `).join("");
+
+  return collapsible(
+    "agents-board",
+    "Coding agents",
+    `<div class="stack-list">${list}</div>`,
+    `${sessions.length} session${sessions.length === 1 ? "" : "s"} ${openLink}`
+  );
+}
+
 function doctorSection(project) {
   const result = doctors.get(project.id);
   const rerun = iconButton("doctor-refresh", "Run doctor again", { project: project.id });
@@ -553,7 +624,10 @@ async function refreshData() {
     // Poll quickly until every status is in, and only then start doctor runs so they don't compete for CPU.
     clearTimeout(pendingTimer);
     if (projects.some((project) => project.pending)) pendingTimer = setTimeout(refreshData, 900);
-    else void loadDoctors();
+    else {
+      void loadDoctors();
+      void loadAgentBoards();
+    }
   } catch (error) {
     // Once projects are on screen, a failed refresh only adds a message. The page stays as it is.
     if (projects.length) {
