@@ -798,9 +798,9 @@ export async function fetchBoardSessions(url = BOARD_URL, timeoutMs = BOARD_SESS
       signal: AbortSignal.timeout(timeoutMs),
       headers: { accept: "application/json" },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const data = await res.json().catch(() => null);
-    if (!data || !Array.isArray(data.sessions)) return [];
+    if (!data || !Array.isArray(data.sessions)) return null;
     return data.sessions
       .filter((s) => s && typeof s.id === "string")
       .map((s) => ({
@@ -813,7 +813,7 @@ export async function fetchBoardSessions(url = BOARD_URL, timeoutMs = BOARD_SESS
         face: s.face && typeof s.face === "object" ? s.face : undefined,
       }));
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -1410,6 +1410,15 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
         }
 
         const allSessions = await fetchBoardSessions(BOARD_URL, BOARD_SESSIONS_TIMEOUT_MS, fetchImpl);
+        if (allSessions === null) {
+          return sendJson(response, 200, {
+            state: "sessions-error",
+            boardUrl: "http://localhost:4100",
+            sessions: [],
+            error: "Unable to load agent sessions.",
+          });
+        }
+
         const sessions = project
           ? allSessions.filter((s) => isSessionInsideProject(s.cwd, project.root))
           : allSessions;

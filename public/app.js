@@ -86,7 +86,7 @@ const ICONS = {
   sparkle: '<path d="M10 2.8c.4 3.1 1.6 4.3 4.7 4.7-3.1.4-4.3 1.6-4.7 4.7-.4-3.1-1.6-4.3-4.7-4.7 3.1-.4 4.3-1.6 4.7-4.7zM15 12.5c.2 1.3.7 1.8 2 2-1.3.2-1.8.7-2 2-.2-1.3-.7-1.8-2-2 1.3-.2 1.8-.7 2-2z" fill="currentColor"/>',
   close: '<path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
 };
-const ACTION_ICONS = { start: "start", stop: "stop", restart: "restart", logs: "logs", "open-project": "folder", "open-terminal": "terminal", "new-project": "plus", "open-existing-project": "folder", "new-resource": "plus", "new-stack": "stack", "move-resource": "move", "config-regenerate": "regenerate", "config-verify": "verify", "hide-project": "hide", "pin-project": "pin", "pin-resource": "pin", "ask-agent": "sparkle", "doctor-refresh": "restart" };
+const ACTION_ICONS = { start: "start", stop: "stop", restart: "restart", logs: "logs", "open-project": "folder", "open-terminal": "terminal", "new-project": "plus", "open-existing-project": "folder", "new-resource": "plus", "new-stack": "stack", "move-resource": "move", "config-regenerate": "regenerate", "config-verify": "verify", "hide-project": "hide", "pin-project": "pin", "pin-resource": "pin", "ask-agent": "sparkle", "doctor-refresh": "restart", "retry-agent-board": "restart" };
 
 // Adds a small SF-Symbol-style glyph in front of each action button label.
 function decorateButtons(root = document) {
@@ -489,12 +489,18 @@ async function loadAgentBoards(force = false) {
   try {
     for (const project of projects) {
       const prev = agentBoards.get(project.id);
-      if (!force && prev && Date.now() - prev.at < AGENT_BOARD_RETRY_MS) continue;
+      if (!force && prev && prev.state !== "sessions-error" && prev.state !== "error" && Date.now() - prev.at < AGENT_BOARD_RETRY_MS) continue;
       try {
         const data = await api(`/api/agents/board?project=${encodeURIComponent(project.id)}`);
         agentBoards.set(project.id, { ...data, at: Date.now() });
       } catch (err) {
-        agentBoards.set(project.id, { state: "not-running", boardUrl: "http://localhost:4100", sessions: [], at: Date.now() });
+        agentBoards.set(project.id, {
+          state: "sessions-error",
+          boardUrl: "http://localhost:4100",
+          sessions: [],
+          error: "Unable to load agent sessions.",
+          at: Date.now(),
+        });
       }
       if (selectedProjectId === project.id) render();
     }
@@ -514,6 +520,14 @@ function agentsSection(project) {
       "agents-board",
       "Coding agents",
       `<div class="empty"><span class="empty-icon" aria-hidden="true">A</span><strong>Run My Agents is not running on port 4100</strong><p>Start the board with <code>flisk up</code> in run-my-agents or launch the Mac app to see active Claude Code and Codex sessions for this project.</p></div>`,
+      openLink
+    );
+  }
+  if (data.state === "sessions-error" || data.state === "error") {
+    return collapsible(
+      "agents-board",
+      "Coding agents",
+      `<div class="empty"><span class="empty-icon" aria-hidden="true">!</span><strong>Unable to load agent sessions</strong><p>Run My Agents responded on port 4100, but failed to return session details. <button class="link-btn" type="button" data-action="retry-agent-board" data-project="${esc(project.id)}">${btnIcon("restart")}Retry</button></p></div>`,
       openLink
     );
   }
@@ -772,6 +786,13 @@ async function handleAction(button) {
     render();
     try { doctors.set(project, { ...(await api(`/api/doctor?project=${encodeURIComponent(project)}&refresh=1`)), at: Date.now() }); } catch (error) { doctors.set(project, { error: error.message, at: Date.now() }); }
     render();
+    return;
+  }
+
+  if (action === "retry-agent-board") {
+    agentBoards.delete(project);
+    render();
+    void loadAgentBoards(true);
     return;
   }
 

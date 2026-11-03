@@ -83,7 +83,7 @@ describe("probeBoardHealth: health checks", () => {
     assert.equal(isUp, true);
   });
 
-  it("returns false when service is not board", async () => {
+  it("returns false when service is not board (incorrect service on port 4100)", async () => {
     const fakeFetch = async () => ({
       ok: true,
       json: async () => ({ status: "ok", service: "other-service" }),
@@ -111,7 +111,7 @@ describe("probeBoardHealth: health checks", () => {
   });
 });
 
-describe("fetchBoardSessions: session normalization", () => {
+describe("fetchBoardSessions: session normalization and retrieval errors", () => {
   it("reads and normalizes sessions, treating optional fields gracefully", async () => {
     const fakeFetch = async () => ({
       ok: true,
@@ -139,6 +139,7 @@ describe("fetchBoardSessions: session normalization", () => {
     });
 
     const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
+    assert.ok(Array.isArray(sessions));
     assert.equal(sessions.length, 2);
     assert.deepEqual(sessions[0], {
       id: "session-1",
@@ -155,12 +156,67 @@ describe("fetchBoardSessions: session normalization", () => {
     assert.equal(sessions[1].status, "unknown");
   });
 
-  it("returns empty array on network failure", async () => {
+  it("returns genuine empty array when response has sessions: []", async () => {
+    const fakeFetch = async () => ({
+      ok: true,
+      json: async () => ({
+        sessions: [],
+        clashes: [],
+      }),
+    });
+    const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
+    assert.ok(Array.isArray(sessions));
+    assert.deepEqual(sessions, []);
+  });
+
+  it("returns null on network failure / connection reset", async () => {
     const fakeFetch = async () => {
-      throw new Error("Network error");
+      throw new Error("ECONNRESET: socket hang up");
     };
     const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
-    assert.deepEqual(sessions, []);
+    assert.equal(sessions, null);
+  });
+
+  it("returns null on HTTP 500", async () => {
+    const fakeFetch = async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: "Internal Server Error" }),
+    });
+    const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
+    assert.equal(sessions, null);
+  });
+
+  it("returns null on timeout / abort", async () => {
+    const fakeFetch = async () => {
+      const err = new Error("The operation was aborted");
+      err.name = "TimeoutError";
+      throw err;
+    };
+    const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
+    assert.equal(sessions, null);
+  });
+
+  it("returns null on invalid JSON", async () => {
+    const fakeFetch = async () => ({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError("Unexpected token in JSON at position 0");
+      },
+    });
+    const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
+    assert.equal(sessions, null);
+  });
+
+  it("returns null on missing or non-array .sessions", async () => {
+    const fakeFetch = async () => ({
+      ok: true,
+      json: async () => ({
+        error: "corrupt state",
+      }),
+    });
+    const sessions = await fetchBoardSessions(BOARD_URL, 1000, fakeFetch);
+    assert.equal(sessions, null);
   });
 });
 
@@ -185,6 +241,29 @@ describe("HTTP server /api/agents/board endpoint", () => {
     const body = await res.json();
     assert.equal(body.state, "not-running");
     assert.equal(body.boardUrl, "http://localhost:4100");
+    assert.deepEqual(body.sessions, []);
+  });
+
+  it("reports state: not-running when incorrect service responds on port 4100", async () => {
+    const project = projectFixture("wrong-service");
+    const fakeFetch = async () => ({
+      ok: true,
+      json: async () => ({ status: "ok", service: "another-app" }),
+    });
+
+    const { server, token } = await serverFor({
+      projects: [project],
+      fetchImpl: fakeFetch,
+    });
+
+    const port = server.address().port;
+    const origin = `http://127.0.0.1:${port}`;
+    const res = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.state, "not-running");
     assert.deepEqual(body.sessions, []);
   });
 
@@ -241,7 +320,7 @@ describe("HTTP server /api/agents/board endpoint", () => {
     assert.deepEqual(bodyB.sessions.map((s) => s.id), ["s-b1"]);
   });
 
-  it("handles board up with zero sessions", async () => {
+  it("handles board up with genuine zero sessions", async () => {
     const project = projectFixture("empty-sessions");
 
     const fakeFetch = async (url) => {
@@ -273,6 +352,173 @@ describe("HTTP server /api/agents/board endpoint", () => {
     const body = await res.json();
     assert.equal(body.state, "running");
     assert.deepEqual(body.sessions, []);
+  });
+
+  it("reports state: sessions-error when board is healthy but sessions fetch returns 500", async () => {
+    const project = projectFixture("error-500");
+
+    const fakeFetch = async (url) => {
+      if (url.endsWith("/health")) {
+        return { ok: true, json: async () => ({ status: "ok", service: "board" }) };
+      }
+      if (url.endsWith("/api/sessions")) {
+        return { ok: false, status: 500, json: async () => ({ error: "Internal crash" }) };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const { server, token } = await serverFor({
+      projects: [project],
+      fetchImpl: fakeFetch,
+    });
+
+    const port = server.address().port;
+    const origin = `http://127.0.0.1:${port}`;
+    const res = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.state, "sessions-error");
+    assert.equal(body.error, "Unable to load agent sessions.");
+    assert.deepEqual(body.sessions, []);
+  });
+
+  it("reports state: sessions-error when board is healthy but sessions fetch has connection reset", async () => {
+    const project = projectFixture("conn-reset");
+
+    const fakeFetch = async (url) => {
+      if (url.endsWith("/health")) {
+        return { ok: true, json: async () => ({ status: "ok", service: "board" }) };
+      }
+      if (url.endsWith("/api/sessions")) {
+        throw new Error("ECONNRESET: socket hang up");
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const { server, token } = await serverFor({
+      projects: [project],
+      fetchImpl: fakeFetch,
+    });
+
+    const port = server.address().port;
+    const origin = `http://127.0.0.1:${port}`;
+    const res = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.state, "sessions-error");
+    assert.deepEqual(body.sessions, []);
+  });
+
+  it("reports state: sessions-error when board is healthy but sessions fetch times out", async () => {
+    const project = projectFixture("timeout-test");
+
+    const fakeFetch = async (url) => {
+      if (url.endsWith("/health")) {
+        return { ok: true, json: async () => ({ status: "ok", service: "board" }) };
+      }
+      if (url.endsWith("/api/sessions")) {
+        const err = new Error("The operation was aborted");
+        err.name = "TimeoutError";
+        throw err;
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const { server, token } = await serverFor({
+      projects: [project],
+      fetchImpl: fakeFetch,
+    });
+
+    const port = server.address().port;
+    const origin = `http://127.0.0.1:${port}`;
+    const res = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.state, "sessions-error");
+    assert.deepEqual(body.sessions, []);
+  });
+
+  it("reports state: sessions-error when board is healthy but sessions fetch returns invalid JSON or missing .sessions", async () => {
+    const project = projectFixture("malformed-sessions");
+
+    const fakeFetch = async (url) => {
+      if (url.endsWith("/health")) {
+        return { ok: true, json: async () => ({ status: "ok", service: "board" }) };
+      }
+      if (url.endsWith("/api/sessions")) {
+        return { ok: true, json: async () => ({ invalid: true }) };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const { server, token } = await serverFor({
+      projects: [project],
+      fetchImpl: fakeFetch,
+    });
+
+    const port = server.address().port;
+    const origin = `http://127.0.0.1:${port}`;
+    const res = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.state, "sessions-error");
+    assert.deepEqual(body.sessions, []);
+  });
+
+  it("recovers after transient sessions error on subsequent request", async () => {
+    const project = projectFixture("recovery-test");
+    let attempts = 0;
+
+    const fakeFetch = async (url) => {
+      if (url.endsWith("/health")) {
+        return { ok: true, json: async () => ({ status: "ok", service: "board" }) };
+      }
+      if (url.endsWith("/api/sessions")) {
+        attempts++;
+        if (attempts === 1) {
+          throw new Error("Temporary glitch");
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            sessions: [{ id: "recovered-1", agent: "claude", cwd: project.root, title: "Recovered", status: "idle" }],
+          }),
+        };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const { server, token } = await serverFor({
+      projects: [project],
+      fetchImpl: fakeFetch,
+    });
+
+    const port = server.address().port;
+    const origin = `http://127.0.0.1:${port}`;
+
+    // First attempt -> sessions-error
+    const res1 = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    const body1 = await res1.json();
+    assert.equal(body1.state, "sessions-error");
+
+    // Second attempt -> recovers to running with session
+    const res2 = await fetch(`${origin}/api/agents/board?project=${project.id}`, {
+      headers: { "x-flisk-token": token, origin },
+    });
+    const body2 = await res2.json();
+    assert.equal(body2.state, "running");
+    assert.equal(body2.sessions.length, 1);
+    assert.equal(body2.sessions[0].id, "recovered-1");
   });
 
   it("returns 400 for unknown project", async () => {
