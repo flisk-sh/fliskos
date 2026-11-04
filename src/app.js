@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { homedir, tmpdir } from "node:os";
-import { basename, delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep, win32 } from "node:path";
 import { spawn } from "node:child_process";
 import { AGENT_PROMPT_LIMIT, AgentError, createAgentHub } from "./agents.js";
 import { appsForProject } from "./apps.js";
@@ -817,30 +817,46 @@ export async function fetchBoardSessions(url = BOARD_URL, timeoutMs = BOARD_SESS
   }
 }
 
-export function canonicalPath(p) {
-  if (!p) return "";
-  const resolved = resolve(p);
+export function canonicalPath(p, platform = process.platform) {
+  if (!p || typeof p !== "string") return "";
+  const isWindows = platform === "win32" || /^[a-zA-Z]:[/\\]/.test(p);
+  const pathModule = isWindows ? win32 : posix;
+  const resolved = pathModule.resolve(p);
+  const clean = (target) => {
+    const formatted = target.replace(/\\/g, "/");
+    const stripped = formatted.replace(/\/+$/, "");
+    return stripped === "" && formatted.startsWith("/") ? "/" : stripped;
+  };
+
   try {
-    return realpathSync(resolved).replace(/\\/g, "/").replace(/\/+$/, "");
+    return clean(realpathSync(resolved));
   } catch {
     let current = resolved;
     const parts = [];
-    while (current !== dirname(current)) {
-      parts.unshift(basename(current));
-      current = dirname(current);
+    while (current !== pathModule.dirname(current)) {
+      parts.unshift(pathModule.basename(current));
+      current = pathModule.dirname(current);
       try {
         const realParent = realpathSync(current);
-        return join(realParent, ...parts).replace(/\\/g, "/").replace(/\/+$/, "");
+        return clean(pathModule.join(realParent, ...parts));
       } catch {}
     }
-    return resolved.replace(/\\/g, "/").replace(/\/+$/, "");
+    return clean(resolved);
   }
 }
 
-export function isSessionInsideProject(sessionCwd, projectPath) {
+export function isSessionInsideProject(sessionCwd, projectPath, platform = process.platform) {
   if (!sessionCwd || !projectPath) return false;
-  const normProject = canonicalPath(projectPath);
-  const normSession = canonicalPath(sessionCwd);
+  let normProject = canonicalPath(projectPath, platform);
+  let normSession = canonicalPath(sessionCwd, platform);
+  if (!normProject || !normSession) return false;
+
+  if (platform === "win32") {
+    normProject = normProject.toLowerCase();
+    normSession = normSession.toLowerCase();
+  }
+
+  if (normProject === "/") return normSession.startsWith("/");
   return normSession === normProject || normSession.startsWith(`${normProject}/`);
 }
 

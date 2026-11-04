@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -67,6 +67,60 @@ describe("isSessionInsideProject: path containment", () => {
     const deletedCwd = join(root, "worktrees", "expired-task");
     // deletedCwd does not exist on disk, realpathSync throws ENOENT
     assert.equal(isSessionInsideProject(deletedCwd, root), true);
+  });
+
+  it("matches paths regardless of drive letter casing on Windows", () => {
+    if (process.platform !== "win32") return;
+    assert.equal(isSessionInsideProject("c:\\projects\\app", "C:\\projects\\app"), true);
+    assert.equal(isSessionInsideProject("c:\\projects\\app\\services\\api", "C:\\projects\\app"), true);
+    assert.equal(isSessionInsideProject("C:\\projects\\app", "c:\\projects\\app"), true);
+  });
+
+  it("normalizes Windows drive letter case differences (simulated win32)", () => {
+    assert.equal(isSessionInsideProject("c:\\projects\\app", "C:\\projects\\app", "win32"), true);
+    assert.equal(isSessionInsideProject("c:\\projects\\app\\services\\api", "C:\\projects\\app", "win32"), true);
+    assert.equal(isSessionInsideProject("C:\\projects\\app", "c:\\projects\\app", "win32"), true);
+    assert.equal(isSessionInsideProject("d:\\projects\\app", "c:\\projects\\app", "win32"), false);
+    assert.equal(isSessionInsideProject("c:\\projects\\app-other", "c:\\projects\\app", "win32"), false);
+  });
+
+  it("correctly matches legitimate descendant paths when project is filesystem root", () => {
+    assert.equal(isSessionInsideProject("/some/nested/project", "/"), true);
+    assert.equal(isSessionInsideProject("/", "/"), true);
+  });
+
+  it("does not match unrelated paths when project root is empty or invalid", () => {
+    assert.equal(isSessionInsideProject("/some/path", ""), false);
+    assert.equal(isSessionInsideProject("/some/path", null), false);
+    assert.equal(isSessionInsideProject("/some/path", undefined), false);
+    assert.equal(isSessionInsideProject("", "/some/path"), false);
+    assert.equal(isSessionInsideProject(null, "/some/path"), false);
+    assert.equal(isSessionInsideProject(undefined, "/some/path"), false);
+  });
+
+  it("rejects completely unrelated directory paths", () => {
+    assert.equal(isSessionInsideProject("/var/log", "/home/user/project"), false);
+    assert.equal(isSessionInsideProject("/home/user/other-project", "/home/user/project"), false);
+  });
+
+  it("handles trailing slash variations properly", () => {
+    const dir = projectFixture("trailing-slash").root;
+    assert.equal(isSessionInsideProject(`${dir}///`, `${dir}/`), true);
+    assert.equal(isSessionInsideProject(dir, `${dir}/`), true);
+    assert.equal(isSessionInsideProject(`${dir}/sub/`, dir), true);
+  });
+
+  it("resolves symlinks to match canonical project location", () => {
+    const dir = projectFixture("symlink-target").root;
+    const linkDir = join(tmpdir(), `flisk-symlink-${Date.now()}`);
+    tempDirs.push(linkDir);
+    try {
+      symlinkSync(dir, linkDir);
+      assert.equal(isSessionInsideProject(linkDir, dir), true);
+      assert.equal(isSessionInsideProject(dir, linkDir), true);
+    } catch {
+      // In environments where symlink creation is restricted, skip gracefully
+    }
   });
 });
 

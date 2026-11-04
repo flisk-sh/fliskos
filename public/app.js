@@ -511,7 +511,8 @@ async function loadAgentBoards(force = false) {
 
 function agentsSection(project) {
   const data = agentBoards.get(project.id);
-  const openLink = `<a class="link-btn" href="http://localhost:4100" target="_blank" rel="noreferrer">${btnIcon("open-project")}Open Run My Agents</a>`;
+  const boardHref = esc(data?.boardUrl || "http://localhost:4100");
+  const openLink = `<a class="link-btn" href="${boardHref}" target="_blank" rel="noreferrer">${btnIcon("open-project")}Open Run My Agents</a>`;
   if (!data) {
     return collapsible("agents-board", "Coding agents", `<div class="doctor-box">Checking Run My Agents (port 4100)…</div>`, openLink);
   }
@@ -543,14 +544,14 @@ function agentsSection(project) {
   const list = sessions.map((s) => `
     <div class="resource-row">
       <div class="resource-name" title="${esc(s.title)}">
-        <i class="state-dot ${s.status === "busy" ? "running" : "ready"} row-dot"></i>
+        <i class="state-dot ${s.status === "busy" ? "pending" : "ready"} row-dot"></i>
         ${esc(s.title)}
         <span class="resource-type">${esc(s.agent)}${s.role ? ` · ${esc(s.role)}` : ""}</span>
       </div>
-      <span class="status-chip ${s.status === "busy" ? "running" : "ready"}">${esc(s.status)}</span>
+      <span class="status-label"><i class="state-dot ${s.status === "busy" ? "pending" : "ready"}"></i>${esc(s.status === "busy" ? "busy" : "ready")}</span>
       <span class="resource-url" title="${esc(s.cwd)}">${esc(s.cwd)}</span>
       <div class="resource-actions">
-        <a class="button quiet" href="http://localhost:4100" target="_blank" rel="noreferrer" title="Open session in Run My Agents">Open</a>
+        <a class="button quiet" href="${boardHref}" target="_blank" rel="noreferrer" title="Open session in Run My Agents">Open</a>
       </div>
     </div>
   `).join("");
