@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir, userInfo } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { buildDemo } from "../website/demo/build.mjs";
 import * as workerModule from "../website/worker.js";
 
 const worker = workerModule.default;
@@ -33,6 +36,24 @@ describe("website worker", () => {
 	});
 });
 
+describe("website demo", () => {
+	it("publishes nothing from the machine that builds it", async () => {
+		const out = mkdtempSync(join(tmpdir(), "fliskos-demo-test-"));
+		try {
+			await buildDemo(out);
+			const data = readFileSync(join(out, "data.js"), "utf8");
+			assert.ok(!data.includes(homedir()), "data.js has this machine's home folder");
+			assert.ok(!data.includes(userInfo().username), "data.js has this machine's user name");
+			assert.match(data, /acme-shop/);
+			const page = readFileSync(join(out, "index.html"), "utf8");
+			assert.ok(!page.includes("__FLISK_CENTER_TOKEN__"));
+			assert.ok(page.indexOf("/demo/demo-api.js") < page.indexOf("/demo/app.js"), "the stand-in API has to load before the app");
+		} finally {
+			rmSync(out, { recursive: true, force: true });
+		}
+	});
+});
+
 describe("website files", () => {
 	it("installs the zip the release build produces", () => {
 		const build = readFileSync(new URL("../macos/build.sh", import.meta.url), "utf8");
@@ -53,7 +74,7 @@ describe("website files", () => {
 	it("links only to files that exist", () => {
 		for (const page of ["index.html", "404.html"]) {
 			for (const [, path] of read(page).matchAll(/(?:src|poster|href)="\/([^"#]+)"/g)) {
-				if (path === "download/mac") continue;
+				if (path === "download/mac" || path === "demo/") continue;
 				assert.ok(existsSync(new URL(path, site)), `${page} links to missing /${path}`);
 			}
 		}
