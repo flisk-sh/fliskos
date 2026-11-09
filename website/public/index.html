@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FliskOS: your projects and coding agents in one Mac window</title>
+<title>FliskOS: every project and every agent in one Mac window</title>
 <meta name="description" content="FliskOS is a free, local Mac app for your Flisk projects, the coding agents that work on them, and the Flisk apps. No keys, no account, nothing hosted.">
-<meta name="theme-color" content="#08090d">
+<meta name="theme-color" content="#000000">
 <link rel="canonical" href="https://os.flisk.si/">
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="FliskOS">
 <meta property="og:url" content="https://os.flisk.si/">
-<meta property="og:title" content="FliskOS: your projects and coding agents in one Mac window">
+<meta property="og:title" content="FliskOS: every project and every agent in one Mac window">
 <meta property="og:description" content="A free, local Mac app for your Flisk projects, your coding agents and the Flisk apps. No keys, no account.">
 <meta property="og:image" content="https://os.flisk.si/media/social.jpg">
 <meta name="twitter:card" content="summary_large_image">
@@ -23,20 +23,20 @@
 <body>
 <header class="top">
 <nav class="wrap" aria-label="Site">
-<a class="brand" href="/"><img src="/favicon.png" alt="" width="24" height="24">FliskOS</a>
-<a href="#agents">Agents</a>
-<a href="#install">Install</a>
+<a class="brand" href="/"><img src="/favicon.png" alt="" width="22" height="22">FliskOS</a>
+<a href="#install">Download</a>
 <a href="https://github.com/flisk-sh/fliskos">GitHub</a>
 </nav>
 </header>
 
 <main>
-<div class="wrap hero">
-<h1>Your projects and coding agents in one window.</h1>
-<p class="lede">FliskOS shows every Flisk project on your Mac, starts and stops its stack, and runs Claude Code, Codex and others right next to it. It runs on your machine and holds no keys or accounts.</p>
+<div class="hero">
+<div class="wrap hero-copy">
+<h1>Every project.<br>Every agent.<br>One window.</h1>
+<p class="lede">Run your Flisk stacks and work with Claude Code, Codex, Cursor, Grok and fx right beside them. Free, local, and it never asks for a key.</p>
 
-<div class="dl">
-<a class="dlb" id="dlb" href="#mac-steps"><b>Download for macOS</b><small>Free · Apple Silicon and Intel · macOS 12+</small></a>
+<a class="button primary" id="dlb" href="#mac-steps"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><b>Download for macOS</b></a>
+
 <div class="steps" id="mac-steps">
 <p class="ok" id="dlok">Do this:</p>
 <ol>
@@ -51,79 +51,98 @@
 <pre>xattr -cr /Applications/FliskOS.app</pre>
 </details>
 </div>
-</div>
-<p class="needs">Needs the <a href="#install">Flisk CLI</a> and Node.js 22.12+ or Bun.</p>
 
-<div class="window">
-<video src="/media/demo.mp4" poster="/media/projects.webp" width="800" height="450" autoplay muted loop playsinline aria-label="FliskOS showing a running project with 3 of 3 resources ready, then a read-only Claude Code thread explaining the stack"></video>
+<p class="source"><a href="https://github.com/flisk-sh/fliskos">Read the source <span aria-hidden="true">↗</span></a></p>
+<p class="needs">Apple Silicon and Intel · macOS 12+ · Needs the Flisk CLI and Node.js 22.12+ or Bun</p>
+</div>
+
+<div class="wrap wide">
+<div class="shot hero-shot"><img src="/media/agents.webp" alt="FliskOS showing a Claude Code thread that explains why a service's ready check fails, with the projects listed in the sidebar" width="2352" height="1568" fetchpriority="high"></div>
 </div>
 </div>
 
 <section class="wrap">
 <div class="feature">
-<div>
-<h2>Every project, at a glance</h2>
-<p class="sub">Health, resources, logs, endpoints and port conflicts for every Flisk project it finds. Start, stop or restart a project, a stack or one resource, and open its folder or a terminal.</p>
+<div class="copy">
+<h2>Your whole stack, at a glance</h2>
+<p>Health, resources, logs, endpoints and port conflicts for every Flisk project it finds. Start, stop or restart a project, a stack or a single resource.</p>
 </div>
-<div class="window"><img src="/media/projects.webp" alt="The FliskOS overview: one project running, 3 of 3 resources ready, health score 94" width="800" height="450" loading="lazy"></div>
+<div class="shot"><img src="/media/overview.webp" alt="The FliskOS overview: average health 97, two of three projects running, and Start, Stop and Restart beside each project" width="1440" height="840" loading="lazy"></div>
 </div>
 </section>
 
 <section class="wrap" id="agents">
-<div class="feature">
-<div>
-<h2>Your agents, inside the project</h2>
-<p class="sub">Start a thread in a project, follow what the agent does, and reply in the same place. Each agent uses the login you already have, and up to four work at once.</p>
+<div class="feature flip">
+<div class="copy">
+<h2>Bring your own login</h2>
+<p>FliskOS never asks for an API key. Each agent runs in the project folder on the login you already have, up to four at once, and you choose per thread whether it can edit.</p>
 </div>
-<div class="window"><img src="/media/agent.webp" alt="A read-only Claude Code thread in FliskOS explaining what runs in a stack" width="800" height="450" loading="lazy"></div>
-</div>
-<div class="tablewrap">
-<table>
-<thead><tr><th scope="col">Agent</th><th scope="col">Read only</th><th scope="col">Edit files</th></tr></thead>
-<tbody>
-<tr><td>Claude Code</td><td>Plan mode</td><td>Accepts edits; commands follow your Claude Code settings</td></tr>
-<tr><td>Codex</td><td>Read-only sandbox</td><td>Workspace sandbox with no network</td></tr>
-<tr><td>Cursor Agent</td><td>Plan mode</td><td>Edits; commands follow your Cursor settings</td></tr>
-<tr><td>Grok Build</td><td>Edits and commands refused</td><td>Edits allowed, commands refused</td></tr>
-<tr><td>fx</td><td>Edits and commands refused</td><td>Edits allowed, commands refused</td></tr>
-</tbody>
-</table>
-</div>
-</section>
-
-<section class="wrap">
-<h2>The Flisk apps, pointed at your project</h2>
-<p class="sub">Links open in your browser and commands are copied, never run.</p>
-<div class="grid">
-<div class="card"><h3>Pages</h3><p>An agent builds a one-page explainer of your stack, and you get the command that publishes it.</p></div>
-<div class="card"><h3>Citable</h3><p>Copy the command that checks each running frontend for AI search.</p></div>
-<div class="card"><h3>Helpdock</h3><p>Open the help center for the project's GitHub repository.</p></div>
-<div class="card"><h3>And more</h3><p>Command Comparer, the DevEx Roadmap and Demos, one click away.</p></div>
-</div>
-</section>
-
-<section class="wrap">
-<h2>Local, and only local</h2>
-<ul class="plain">
-<li>The server binds only to <code>127.0.0.1</code>, with a random token for each session.</li>
-<li>It never asks for an API key. There is no account and no hosted control plane.</li>
-<li>A native window of about 1 MB, not Electron.</li>
-<li>MIT licensed. <a href="https://github.com/flisk-sh/fliskos">Read the source</a>.</li>
+<ul class="panel agents">
+<li><b>Claude Code</b><span><em>Read only</em> plan mode</span><span><em>Edit</em> accepts edits; commands follow your settings</span></li>
+<li><b>Codex</b><span><em>Read only</em> read-only sandbox</span><span><em>Edit</em> workspace sandbox, no network</span></li>
+<li><b>Cursor Agent</b><span><em>Read only</em> plan mode</span><span><em>Edit</em> edits; commands follow your settings</span></li>
+<li><b>Grok Build</b><span><em>Read only</em> edits and commands refused</span><span><em>Edit</em> edits allowed, commands refused</span></li>
+<li><b>fx</b><span><em>Read only</em> edits and commands refused</span><span><em>Edit</em> edits allowed, commands refused</span></li>
 </ul>
+</div>
 </section>
 
-<section class="wrap needlist" id="install">
-<h2>What you need</h2>
-<p class="sub">FliskOS drives the Flisk CLI, so install that first. The script never runs sudo.</p>
-<pre>curl -fsSL https://flisk.sh/install.sh | sh</pre>
-<p class="sub">Then install FliskOS. You also need <a href="https://nodejs.org">Node.js 22.12+</a> or <a href="https://bun.sh">Bun</a> on your login shell's PATH.</p>
-<pre>curl -fsSL https://os.flisk.si/install.sh | sh</pre>
-<p class="needs">On Linux or from a checkout, <a href="https://github.com/flisk-sh/fliskos#run-from-a-checkout">run it with Node or Bun</a>.</p>
+<section class="wrap">
+<div class="feature">
+<div class="copy">
+<h2>Find out what broke, then ask</h2>
+<p>A doctor score for each project, with the warnings that cost it points. From the logs, Ask an agent opens a thread with the output already in the prompt and secret-looking values redacted.</p>
+</div>
+<div class="shot"><img src="/media/project.webp" alt="A project in FliskOS with a doctor score of 95 out of 100, 18 checks passed and 2 warnings" width="1440" height="718" loading="lazy"></div>
+</div>
+</section>
+
+<section class="wrap">
+<div class="feature flip">
+<div class="copy">
+<h2>The rest of Flisk, built in</h2>
+<p>Pages, Citable, Helpdock, the Command Comparer, the DevEx Roadmap and Demos, pointed at the project you pick. Links open in your browser. Commands are copied, never run.</p>
+</div>
+<div class="shot"><img src="/media/apps.webp" alt="The Apps screen in FliskOS with cards for Pages, Citable, Helpdock, Command Comparer, DevEx Roadmap and Demos" width="1440" height="874" loading="lazy"></div>
+</div>
+</section>
+
+<section class="wrap">
+<div class="local">
+<div class="terminal" aria-label="FliskOS starting in a terminal">
+<pre><span class="dim">$</span> fliskos --no-open
+FliskOS is running at <span class="hl">http://127.0.0.1:52841/</span>?token=••••
+Press Ctrl+C to close the local command center.</pre>
+</div>
+<div class="panel notes">
+<h2>It lives on your machine</h2>
+<ul>
+<li>Binds only to <code>127.0.0.1</code>, with a random token for each session.</li>
+<li>No account and no hosted control plane.</li>
+<li>A native window of about 1 MB, not Electron.</li>
+<li>MIT licensed, so you can read it and change it.</li>
+</ul>
+<a class="button" href="https://github.com/flisk-sh/fliskos">View on GitHub</a>
+</div>
+</div>
+</section>
+
+<section class="wrap closing" id="install">
+<h2>Put your agents next to your stack.</h2>
+<p class="lede">Two commands. The first installs the Flisk CLI that FliskOS drives, and you can skip it if you have one.</p>
+<div class="commands">
+<div class="command"><code>curl -fsSL https://flisk.sh/install.sh | sh</code><button class="button" type="button" data-copy="curl -fsSL https://flisk.sh/install.sh | sh">Copy</button></div>
+<div class="command"><code>curl -fsSL https://os.flisk.si/install.sh | sh</code><button class="button primary" type="button" data-copy="curl -fsSL https://os.flisk.si/install.sh | sh">Copy</button></div>
+</div>
+<p class="needs">FliskOS also needs <a href="https://nodejs.org">Node.js 22.12+</a> or <a href="https://bun.sh">Bun</a>. On Linux, <a href="https://github.com/flisk-sh/fliskos#run-from-a-checkout">run it from a checkout</a>.</p>
 </section>
 </main>
 
 <footer>
-<div class="wrap">MIT licensed. Part of <a href="https://flisk.sh">Flisk</a>. <a href="https://github.com/flisk-sh/fliskos">Source on GitHub</a>.</div>
+<div class="wrap">
+<span>MIT licensed. Part of <a href="https://flisk.sh">Flisk</a>. Screens show sample projects.</span>
+<a href="https://github.com/flisk-sh/fliskos">GitHub</a>
+</div>
 </footer>
 </body>
 </html>
