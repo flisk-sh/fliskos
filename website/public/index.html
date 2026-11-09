@@ -24,6 +24,7 @@
 <header class="top">
 <nav class="wrap" aria-label="Site">
 <a class="brand" href="/"><img src="/favicon.png" alt="" width="22" height="22">FliskOS</a>
+<a href="#demo">Try it</a>
 <a href="#install">Download</a>
 <a href="https://github.com/flisk-sh/fliskos">GitHub</a>
 </nav>
@@ -32,15 +33,15 @@
 <main>
 <div class="hero">
 <div class="wrap hero-copy">
-<div class="hero-icons" aria-hidden="true">
-<span class="tile claude" title="Claude Code"><img src="/media/icons/claude.svg" alt="" width="46" height="46"></span>
-<span class="tile cursor" title="Cursor Agent"><img src="/media/icons/cursor.svg" alt="" width="30" height="30"></span>
-<span class="tile fx" title="fx">fx</span>
-<span class="tile codex" title="Codex"><img src="/media/icons/codex.svg" alt="" width="46" height="46"></span>
-<span class="tile grok" title="Grok Build"><img src="/media/icons/grok.svg" alt="" width="30" height="30"></span>
-<span class="tile flisk" title="Flisk"><img src="/media/icons/flisk.svg" alt="" width="36" height="36"></span>
+<div class="hero-icons" role="group" aria-label="Try an agent in the demo">
+<button type="button" class="tile claude" title="Claude Code" aria-label="Try Claude Code in the demo" data-demo="agent" data-provider="claude"><img src="/media/icons/claude.svg" alt="" width="46" height="46"></button>
+<button type="button" class="tile cursor" title="Cursor Agent" aria-label="Try Cursor Agent in the demo" data-demo="agent" data-provider="cursor"><img src="/media/icons/cursor.svg" alt="" width="30" height="30"></button>
+<button type="button" class="tile fx" title="fx" aria-label="Try fx in the demo" data-demo="agent" data-provider="fx">fx</button>
+<button type="button" class="tile codex" title="Codex" aria-label="Try Codex in the demo" data-demo="agent" data-provider="codex"><img src="/media/icons/codex.svg" alt="" width="46" height="46"></button>
+<button type="button" class="tile grok" title="Grok Build" aria-label="Try Grok Build in the demo" data-demo="agent" data-provider="grok"><img src="/media/icons/grok.svg" alt="" width="30" height="30"></button>
+<button type="button" class="tile flisk" title="Flisk" aria-label="Open your projects in the demo" data-demo="overview"><img src="/media/icons/flisk.svg" alt="" width="36" height="36"></button>
 </div>
-<h1>Every project.<br>Every agent.<br>One window.</h1>
+<h1>Every project.<br>Every agent.<br><span class="glow">One window.</span></h1>
 <p class="lede">Run your Flisk stacks and work with Claude Code, Codex, Cursor, Grok and fx right beside them. Free, local, and it never asks for a key.</p>
 
 <a class="button primary" id="dlb" href="#mac-steps"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><b>Download for macOS</b></a>
@@ -60,12 +61,16 @@
 </details>
 </div>
 
-<p class="source"><a href="https://github.com/flisk-sh/fliskos">Read the source <span aria-hidden="true">↗</span></a></p>
+<p class="source"><a href="#demo">Try it right here <span aria-hidden="true">↓</span></a><a href="https://github.com/flisk-sh/fliskos">Read the source <span aria-hidden="true">↗</span></a></p>
 <p class="needs">Apple Silicon and Intel · macOS 12+ · Needs the Flisk CLI and Node.js 22.12+ or Bun</p>
 </div>
 
 <div class="wrap wide">
-<div class="shot hero-shot"><img src="/media/agents.webp" alt="FliskOS showing a Claude Code thread that explains why a service's ready check fails, with the projects listed in the sidebar" width="2352" height="1568" fetchpriority="high"></div>
+<div class="window hero-shot" id="demo">
+<div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>FliskOS</span><em><b></b>Live demo</em></div>
+<iframe id="demo-frame" src="/demo/" title="FliskOS, running live in this page on sample projects"></iframe>
+</div>
+<p class="demo-note">That is the real FliskOS, running on sample projects. Press Start, open a thread, ask an agent something.</p>
 </div>
 </div>
 
@@ -75,7 +80,7 @@
 <h2>Your whole stack, at a glance</h2>
 <p>Health, resources, logs, endpoints and port conflicts for every Flisk project it finds. Start, stop or restart a project, a stack or a single resource.</p>
 </div>
-<div class="shot"><img src="/media/overview.webp" alt="The FliskOS overview: average health 97, two of three projects running, and Start, Stop and Restart beside each project" width="1440" height="840" loading="lazy"></div>
+<button type="button" class="shot try" data-demo="overview" aria-label="Open the overview in the demo"><img src="/media/overview.webp" alt="The FliskOS overview: average health 97, two of three projects running, and Start, Stop and Restart beside each project" width="1440" height="840" loading="lazy"><span class="try-label" aria-hidden="true">Try it live</span></button>
 </div>
 </section>
 
@@ -86,11 +91,11 @@
 <p>FliskOS never asks for an API key. Each agent runs in the project folder on the login you already have, up to four at once, and you choose per thread whether it can edit.</p>
 </div>
 <ul class="panel agents">
-<li><b>Claude Code</b><span><em>Read only</em> plan mode</span><span><em>Edit</em> accepts edits; commands follow your settings</span></li>
-<li><b>Codex</b><span><em>Read only</em> read-only sandbox</span><span><em>Edit</em> workspace sandbox, no network</span></li>
-<li><b>Cursor Agent</b><span><em>Read only</em> plan mode</span><span><em>Edit</em> edits; commands follow your settings</span></li>
-<li><b>Grok Build</b><span><em>Read only</em> edits and commands refused</span><span><em>Edit</em> edits allowed, commands refused</span></li>
-<li><b>fx</b><span><em>Read only</em> edits and commands refused</span><span><em>Edit</em> edits allowed, commands refused</span></li>
+<li><button type="button" data-demo="agent" data-provider="claude"><b>Claude Code</b><span><em>Read only</em> plan mode</span><span><em>Edit</em> accepts edits; commands follow your settings</span><i aria-hidden="true">Try it →</i></button></li>
+<li><button type="button" data-demo="agent" data-provider="codex"><b>Codex</b><span><em>Read only</em> read-only sandbox</span><span><em>Edit</em> workspace sandbox, no network</span><i aria-hidden="true">Try it →</i></button></li>
+<li><button type="button" data-demo="agent" data-provider="cursor"><b>Cursor Agent</b><span><em>Read only</em> plan mode</span><span><em>Edit</em> edits; commands follow your settings</span><i aria-hidden="true">Try it →</i></button></li>
+<li><button type="button" data-demo="agent" data-provider="grok"><b>Grok Build</b><span><em>Read only</em> edits and commands refused</span><span><em>Edit</em> edits allowed, commands refused</span><i aria-hidden="true">Try it →</i></button></li>
+<li><button type="button" data-demo="agent" data-provider="fx"><b>fx</b><span><em>Read only</em> edits and commands refused</span><span><em>Edit</em> edits allowed, commands refused</span><i aria-hidden="true">Try it →</i></button></li>
 </ul>
 </div>
 </section>
@@ -101,7 +106,7 @@
 <h2>Find out what broke, then ask</h2>
 <p>A doctor score for each project, with the warnings that cost it points. From the logs, Ask an agent opens a thread with the output already in the prompt and secret-looking values redacted.</p>
 </div>
-<div class="shot"><img src="/media/project.webp" alt="A project in FliskOS with a doctor score of 95 out of 100, 18 checks passed and 2 warnings" width="1440" height="718" loading="lazy"></div>
+<button type="button" class="shot try" data-demo="project" aria-label="Open this project in the demo"><img src="/media/project.webp" alt="A project in FliskOS with a doctor score of 95 out of 100, 18 checks passed and 2 warnings" width="1440" height="718" loading="lazy"><span class="try-label" aria-hidden="true">Try it live</span></button>
 </div>
 </section>
 
@@ -111,7 +116,7 @@
 <h2>The rest of Flisk, built in</h2>
 <p>Pages, Citable, Helpdock, the Command Comparer, the DevEx Roadmap and Demos, pointed at the project you pick. Links open in your browser. Commands are copied, never run.</p>
 </div>
-<div class="shot"><img src="/media/apps.webp" alt="The Apps screen in FliskOS with cards for Pages, Citable, Helpdock, Command Comparer, DevEx Roadmap and Demos" width="1440" height="874" loading="lazy"></div>
+<button type="button" class="shot try" data-demo="apps" aria-label="Open Apps in the demo"><img src="/media/apps.webp" alt="The Apps screen in FliskOS with cards for Pages, Citable, Helpdock, Command Comparer, DevEx Roadmap and Demos" width="1440" height="874" loading="lazy"><span class="try-label" aria-hidden="true">Try it live</span></button>
 </div>
 </section>
 
