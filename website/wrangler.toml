@@ -5,6 +5,9 @@ main = "worker.js"
 compatibility_date = "2026-11-09"
 routes = [{ pattern = "os.flisk.si", custom_domain = true }]
 
+[build]
+command = "node demo/build.mjs"
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
