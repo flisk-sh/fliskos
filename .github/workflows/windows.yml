@@ -1,0 +1,47 @@
+# Checks FliskOS on a real Windows machine: the test suite, the real Flisk CLI, and installing and opening the app.
+name: Windows
+
+on:
+  pull_request:
+    paths: ["src/**", "public/**", "test/**", "windows/**", "website/public/install.ps1", ".github/workflows/windows.yml"]
+  push:
+    branches: [main]
+    paths: ["src/**", "public/**", "test/**", "windows/**", "website/public/install.ps1", ".github/workflows/windows.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows app
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Install the real Flisk CLI
+        shell: pwsh
+        run: |
+          irm https://flisk.sh/install.ps1 | iex
+          "$env:LOCALAPPDATA\flisk\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Tests
+        env:
+          FLISKOS_REAL_CLI: "1"
+        run: node --test
+      - name: Build
+        shell: powershell
+        run: ./windows/build.ps1
+      - name: Install it and open it
+        shell: powershell
+        run: ./windows/smoke.ps1
+      - name: Keep the screenshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-screen
+          path: dist/windows-screen.png
+          if-no-files-found: ignore

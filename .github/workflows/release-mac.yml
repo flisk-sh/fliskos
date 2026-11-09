@@ -1,13 +1,13 @@
-# Builds the Mac app and attaches it to a GitHub release, so os.flisk.si/install.sh and /download/mac
-# (releases/latest/download/FliskOS-macOS.zip) always serve the newest app. Runs on a v* tag, by hand for an existing
+# Builds the Mac and Windows apps and attaches them to a GitHub release, so os.flisk.si/install.sh, /install.ps1 and
+# /download/mac (releases/latest/download/FliskOS-macOS.zip) always serve the newest app. Runs on a v* tag, by hand for an existing
 # tag, and on every merge to main that changes the app: that one picks the next patch version.
-name: Release | Mac app
+name: Release | Desktop apps
 
 on:
   push:
     tags: ["v*"]
     branches: [main]
-    paths: ["src/**", "public/**", "macos/**", "package.json", ".github/workflows/release-mac.yml"]
+    paths: ["src/**", "public/**", "macos/**", "windows/**", "package.json", ".github/workflows/release-mac.yml"]
   workflow_dispatch:
     inputs:
       tag:
@@ -27,6 +27,8 @@ jobs:
     name: Mac app
     runs-on: macos-latest
     timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.published.outputs.tag }}
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
@@ -62,6 +64,34 @@ jobs:
           for _ in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:4799/ && break; sleep 1; done
           curl -s -o /dev/null http://127.0.0.1:4799/ || { cat "$RUNNER_TEMP/app.log"; exit 1; }
       - name: Attach to the release
+        id: published
         run: |
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" --title "FliskOS ${TAG#v}" --generate-notes
           gh release upload "$TAG" dist/FliskOS-macOS.zip --clobber
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows app
+    needs: mac
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ needs.mac.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Build
+        shell: powershell
+        run: ./windows/build.ps1
+      - name: Install it and open it
+        shell: powershell
+        run: ./windows/smoke.ps1
+      - name: Attach to the release
+        shell: bash
+        run: gh release upload "$TAG" dist/FliskOS-windows.zip --clobber

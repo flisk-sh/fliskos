@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { AGENT_PROMPT_LIMIT, AgentError, createAgentHub } from "./agents.js";
 import { appsForProject } from "./apps.js";
 import { createTokenCache } from "./token-savings.js";
+import { executableNames, programName, windowsLaunch, windowsSearchDirs } from "./windows.js";
 
 const APP_VERSION = (() => {
   try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; }
@@ -92,6 +93,7 @@ export function commonProjectScanRoots(home = homedir()) {
     join(home, "workspace"),
     join(home, "Workspaces"),
     join(home, "Documents", "Projects"),
+    join(home, "source", "repos"),
     join(home, "Documents", "Workspaces"),
   ];
 }
@@ -420,10 +422,10 @@ export function cliBinaryCandidates(env = process.env) {
   const pathEntries = (env.PATH ?? "").split(delimiter).filter(Boolean);
   // Keep the app's native-first PATH for Colima/Lima, but prefer conventional
   // package-manager installs for the CLI over older copies in language-manager bins.
-  const preferredEntries = ["/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".bun", "bin"), join(homedir(), ".local", "bin"), join(homedir(), ".n", "bin")];
+  const preferredEntries = ["/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".bun", "bin"), join(homedir(), ".local", "bin"), join(homedir(), ".n", "bin"), ...windowsSearchDirs(env)];
   const directories = [...new Set([...preferredEntries, ...pathEntries])];
   // The current `flisk` name wins over the legacy `tdk` alias wherever both are installed.
-  return CLI_BINARY_NAMES.flatMap((name) => directories.map((entry) => join(entry, name)))
+  return CLI_BINARY_NAMES.flatMap((name) => directories.flatMap((entry) => executableNames(name).map((file) => join(entry, file))))
     .filter((candidate) => existsSync(candidate));
 }
 
@@ -436,7 +438,7 @@ export function resolveTdkBinary(env = process.env) {
 
 // The name the CLI is invoked by, used in messages and in the argv the UI shows.
 export function cliCommandName(env = process.env) {
-  return basename(resolveTdkBinary(env));
+  return programName(resolveTdkBinary(env));
 }
 
 export function runTdk(project, args, { binary = CLI_FALLBACK_NAME, timeoutMs = 30_000, detached = false } = {}) {
@@ -452,7 +454,9 @@ export function runTdk(project, args, { binary = CLI_FALLBACK_NAME, timeoutMs = 
       ...(savedPort ? { TILT_PORT: String(savedPort) } : {}),
     };
     const command = CLI_BINARY_NAMES.includes(binary) ? resolveTdkBinary(env) : binary;
-    const child = spawn(command, args, {
+    const launch = windowsLaunch(command, args, { env });
+    const child = spawn(launch.command, launch.args, {
+      ...launch.options,
       cwd: project.root,
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -568,7 +572,7 @@ export async function probeCli(execute, cwd = process.cwd()) {
     helps = accepted.helps;
     selectedCliBinary = accepted.candidate;
   }
-  const program = helps.map((help) => usageOf(help)).find(Boolean)?.program ?? basename(binary);
+  const program = helps.map((help) => usageOf(help)).find(Boolean)?.program ?? programName(binary);
   const label = cliLabel(program);
   if (versionResult.status !== 0) {
     const missing = /ENOENT/.test(versionResult.stderr);
