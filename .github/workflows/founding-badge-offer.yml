@@ -10,8 +10,6 @@ name: Founding badge offer
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] never checks out or runs PR code; only reads event data and posts one comment
     types: [closed]
-  pull_request:
-    types: [opened, synchronize]
 
 permissions: {}
 
@@ -20,7 +18,11 @@ jobs:
     name: Offer the numbered badge
     # Skips the people the Discord bot refuses (scripts/discord-founding-role.mjs in flisk-sh/flisk).
     # Private org members can arrive as CONTRIBUTOR, so they are named as well.
-    if: true
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.user.type == 'User' &&
+      !contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association) &&
+      !contains(fromJSON('["kburym","odykyi","biomekonoko"]'), github.event.pull_request.user.login)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
