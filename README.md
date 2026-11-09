@@ -105,7 +105,13 @@ The state file is `~/Library/Application Support/FliskOS/state.json` on macOS an
 
 ## macOS app
 
-A lightweight native app (about 1 MB, most of it the icon; a WKWebView shell, no Electron) that runs the same server in its own window:
+A lightweight native app (about 1 MB, most of it the icon; a WKWebView shell, no Electron) that runs the same server in its own window. Install the latest release from [os.flisk.si](https://os.flisk.si):
+
+```sh
+curl -fsSL https://os.flisk.si/install.sh | sh
+```
+
+Run it again to update. Or build it from a checkout:
 
 ```sh
 npm run install:mac     # builds, then installs FliskOS into /Applications (or ~/Applications)

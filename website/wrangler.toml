@@ -1,0 +1,18 @@
+# Deploy: cd website && bunx wrangler@4 deploy
+# The custom domain needs no DNS record of its own; Cloudflare creates it.
+name = "fliskos-site"
+main = "worker.js"
+compatibility_date = "2026-11-09"
+routes = [{ pattern = "os.flisk.si", custom_domain = true }]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "404-page"
+run_worker_first = ["/download/*"]
+
+[observability]
+enabled = true
+
+[observability.traces]
+enabled = true

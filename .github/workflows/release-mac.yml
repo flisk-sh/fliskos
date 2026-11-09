@@ -1,0 +1,66 @@
+# Builds the Mac app and attaches it to a GitHub release, so os.flisk.si/install.sh and /download/mac
+# (releases/latest/download/FliskOS-macOS.zip) always serve the newest app. Runs on a v* tag, by hand for an existing
+# tag, and on every merge to main that changes the app: that one picks the next patch version.
+name: Release | Mac app
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+    paths: ["src/**", "public/**", "macos/**", "package.json", ".github/workflows/release-mac.yml"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build, like v0.2.1"
+        required: true
+
+permissions:
+  contents: write
+
+# One release at a time, so two quick merges do not both pick the same next version.
+concurrency:
+  group: release-mac
+  cancel-in-progress: false
+
+jobs:
+  mac:
+    name: Mac app
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.3
+      - name: Pick the next version (merge to main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # The first release takes the version in package.json; later ones add one to the patch number.
+          if last="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null)"; then
+            IFS=. read -r major minor patch <<< "${last#v}"
+            next="v$major.$minor.$((patch + 1))"
+          else
+            next="v$(bun -p 'require("./package.json").version')"
+          fi
+          echo "TAG=$next" >> "$GITHUB_ENV"
+          echo "Releasing $next"
+      - name: Build
+        run: FLISKOS_VERSION="$TAG" ./macos/build.sh --release
+      - name: The bundled app runs on both architectures and serves its page
+        run: |
+          app=dist/FliskOS.app/Contents
+          lipo -archs "$app/MacOS/FliskOS" | grep -q arm64
+          lipo -archs "$app/MacOS/FliskOS" | grep -q x86_64
+          (FLISKOS_STATE="$RUNNER_TEMP/state.json" bun "$app/Resources/app/src/cli.js" --no-open --no-scan --port 4799 > "$RUNNER_TEMP/app.log" 2>&1 &)
+          for _ in $(seq 1 20); do curl -s -o /dev/null http://127.0.0.1:4799/ && break; sleep 1; done
+          curl -s -o /dev/null http://127.0.0.1:4799/ || { cat "$RUNNER_TEMP/app.log"; exit 1; }
+      - name: Attach to the release
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" --title "FliskOS ${TAG#v}" --generate-notes
+          gh release upload "$TAG" dist/FliskOS-macOS.zip --clobber

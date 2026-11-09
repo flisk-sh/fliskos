@@ -1,6 +1,10 @@
 # The README demo loop is for GitHub. Keep it out of the npm package.
 docs/media/
 
+# The website and its Worker deploy to Cloudflare, not npm.
+website/
+.github/
+
 # npm ignores .gitignore once this file exists, so repeat its entries.
 node_modules/
 .DS_Store
