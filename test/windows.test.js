@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { probeCli, runTdk } from "../src/app.js";
+import { maskPaths, probeCli, runTdk } from "../src/app.js";
 import { cmdQuote, executableNames, programName, shimTarget, windowsLaunch } from "../src/windows.js";
 
 // What `npm install -g` writes, trimmed to the lines that matter.
@@ -26,6 +26,13 @@ describe("finding programs", () => {
     assert.equal(programName("/bin/flisk"), "flisk");
     assert.equal(programName("flisk.exe"), "flisk");
     assert.equal(programName("flisk.CMD"), "flisk");
+  });
+});
+
+describe("hiding the account name", () => {
+  it("masks a Windows path, in plain text and inside JSON", () => {
+    assert.equal(maskPaths("C:\\Users\\alex\\code"), "C:\\Users\\****\\code");
+    assert.equal(maskPaths(JSON.stringify({ path: "C:\\Users\\alex\\code" })), JSON.stringify({ path: "C:\\Users\\****\\code" }));
   });
 });
 

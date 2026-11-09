@@ -31,7 +31,8 @@ jobs:
       - name: Tests
         env:
           FLISKOS_REAL_CLI: "1"
-        run: node --test
+        # The older tests use Unix paths and sh scripts as fixtures, so they only run on Mac and Linux.
+        run: node --test --test-timeout=120000 test/windows.test.js
       - name: Build
         shell: powershell
         run: ./windows/build.ps1

@@ -151,10 +151,12 @@ function sameSecret(left, right) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// On Windows the home path appears in JSON with its backslashes doubled.
+const maskHome = (text, home) => text.split(home).join("~").split(home.replaceAll("\\", "\\\\")).join("~");
+
 // Never show the account name: the home path becomes ~ and any other /Users/<name> becomes /Users/****.
 export function maskPaths(text) {
-  const home = homedir();
-  return text.split(home).join("~").replace(/\/Users\/(?!\*{4})[^/\\"\s]+/g, "/Users/****");
+  return maskHome(text, homedir()).replace(/\/Users\/(?!\*{4})[^/\\"\s]+/g, "/Users/****").replace(/([A-Za-z]:(?:\\\\|\\)Users(?:\\\\|\\))(?!\*{4})[^\\"\s]+/g, "$1****");
 }
 
 function sendJson(response, status, data) {

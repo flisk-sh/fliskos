@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FliskOS: every project and every agent in one Mac window</title>
-<meta name="description" content="FliskOS is a free, local Mac app for your Flisk projects, the coding agents that work on them, and the Flisk apps. No keys, no account, nothing hosted.">
+<title>FliskOS: every project and every agent in one window</title>
+<meta name="description" content="FliskOS is a free, local desktop app for your Flisk projects, the coding agents that work on them, and the Flisk apps. No keys, no account, nothing hosted.">
 <meta name="theme-color" content="#000000">
 <link rel="canonical" href="https://os.flisk.si/">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -12,13 +12,13 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="FliskOS">
 <meta property="og:url" content="https://os.flisk.si/">
-<meta property="og:title" content="FliskOS: every project and every agent in one Mac window">
-<meta property="og:description" content="A free, local Mac app for your Flisk projects, your coding agents and the Flisk apps. No keys, no account.">
+<meta property="og:title" content="FliskOS: every project and every agent in one window">
+<meta property="og:description" content="A free, local desktop app for your Flisk projects, your coding agents and the Flisk apps. No keys, no account.">
 <meta property="og:image" content="https://os.flisk.si/media/social.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/site.css">
 <script src="/site.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"FliskOS","description":"A local Mac app for Flisk projects, coding agents and the Flisk apps.","applicationCategory":"DeveloperApplication","operatingSystem":"macOS 12 or later","url":"https://os.flisk.si/","downloadUrl":"https://os.flisk.si/download/mac","license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"FliskOS","description":"A local Mac app for Flisk projects, coding agents and the Flisk apps.","applicationCategory":"DeveloperApplication","operatingSystem":"macOS 12 or later, Windows 10 or later","url":"https://os.flisk.si/","downloadUrl":"https://os.flisk.si/download/mac","license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
 </head>
 <body>
 <header class="top">
@@ -61,8 +61,8 @@
 </details>
 </div>
 
-<p class="source"><a href="#demo">Try it right here <span aria-hidden="true">↓</span></a><a href="https://github.com/flisk-sh/fliskos">Read the source <span aria-hidden="true">↗</span></a></p>
-<p class="needs">Apple Silicon and Intel · macOS 12+ · Needs the Flisk CLI and Node.js 22.12+ or Bun</p>
+<p class="source"><a href="#demo">Try it right here <span aria-hidden="true">↓</span></a><a href="#windows">Also on Windows</a><a href="https://github.com/flisk-sh/fliskos">Read the source <span aria-hidden="true">↗</span></a></p>
+<p class="needs">macOS 12+ and Windows 10+ · Needs the Flisk CLI and Node.js 22.12+ or Bun</p>
 </div>
 
 <div class="wrap wide">
@@ -143,9 +143,15 @@ Press Ctrl+C to close the local command center.</pre>
 <section class="wrap closing" id="install">
 <h2>Put your agents next to your stack.</h2>
 <p class="lede">Two commands. The first installs the Flisk CLI that FliskOS drives, and you can skip it if you have one.</p>
+<p class="os">macOS</p>
 <div class="commands">
 <div class="command"><code>curl -fsSL https://flisk.sh/install.sh | sh</code><button class="button" type="button" data-copy="curl -fsSL https://flisk.sh/install.sh | sh">Copy</button></div>
 <div class="command"><code>curl -fsSL https://os.flisk.si/install.sh | sh</code><button class="button primary" type="button" data-copy="curl -fsSL https://os.flisk.si/install.sh | sh">Copy</button></div>
+</div>
+<p class="os" id="windows">Windows, in PowerShell</p>
+<div class="commands">
+<div class="command"><code>irm https://flisk.sh/install.ps1 | iex</code><button class="button" type="button" data-copy="irm https://flisk.sh/install.ps1 | iex">Copy</button></div>
+<div class="command"><code>irm https://os.flisk.si/install.ps1 | iex</code><button class="button primary" type="button" data-copy="irm https://os.flisk.si/install.ps1 | iex">Copy</button></div>
 </div>
 <p class="needs">FliskOS also needs <a href="https://nodejs.org">Node.js 22.12+</a> or <a href="https://bun.sh">Bun</a>. On Linux, <a href="https://github.com/flisk-sh/fliskos#run-from-a-checkout">run it from a checkout</a>.</p>
 </section>
