@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
+import { executableNames, windowsLaunch, windowsSearchDirs } from "./windows.js";
 
 export const AGENT_MODES = ["plan", "edit"];
 export const AGENT_PROMPT_LIMIT = 20_000;
@@ -103,7 +104,7 @@ export const AGENT_PROVIDERS = [
 // Apps opened from Finder get a short PATH, so the usual install folders are searched too.
 function searchDirs(env = process.env) {
   const home = homedir();
-  const preferred = [join(home, ".local", "bin"), join(home, ".bun", "bin"), "/opt/homebrew/bin", "/usr/local/bin", join(home, ".npm-global", "bin"), join(home, ".cursor", "bin"), join(home, ".fx", "bin"), join(home, ".grok", "bin")];
+  const preferred = [join(home, ".local", "bin"), join(home, ".bun", "bin"), "/opt/homebrew/bin", "/usr/local/bin", join(home, ".npm-global", "bin"), join(home, ".cursor", "bin"), join(home, ".fx", "bin"), join(home, ".grok", "bin"), ...windowsSearchDirs(env)];
   return [...new Set([...preferred, ...(env.PATH ?? "").split(delimiter).filter(Boolean)])];
 }
 
@@ -114,8 +115,10 @@ export function agentEnv(env = process.env) {
 export function locateAgent(provider, env = process.env) {
   for (const name of provider.binaries) {
     for (const dir of searchDirs(env)) {
-      const path = join(dir, name);
-      if (existsSync(path)) return path;
+      for (const file of executableNames(name)) {
+        const path = join(dir, file);
+        if (existsSync(path)) return path;
+      }
     }
   }
   return null;
@@ -127,7 +130,8 @@ export function agentVersion(command, prefix = [], env = process.env) {
     let output = "";
     let child;
     try {
-      child = spawn(command, [...prefix, "--version"], { env: agentEnv(env), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      const launch = windowsLaunch(command, [...prefix, "--version"], { env });
+      child = spawn(launch.command, launch.args, { ...launch.options, env: agentEnv(env), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     } catch {
       return resolvePromise(null);
     }
@@ -534,7 +538,8 @@ export function createAgentHub({ dir = null, providers = AGENT_PROVIDERS, locate
     const pipeIn = provider.transport === "acp" || provider.stdin;
     let child;
     try {
-      child = spawnProcess(launch.command, [...launch.prefix, ...args], { cwd: thread.root, env: agentEnv(env), stdio: [pipeIn ? "pipe" : "ignore", "pipe", "pipe"], windowsHide: true });
+      const started = windowsLaunch(launch.command, [...launch.prefix, ...args], { env });
+      child = spawnProcess(started.command, started.args, { ...started.options, cwd: thread.root, env: agentEnv(env), stdio: [pipeIn ? "pipe" : "ignore", "pipe", "pipe"], windowsHide: true });
     } catch (error) {
       rec.finish({ ok: false, error: `Could not start ${provider.label}: ${error instanceof Error ? error.message : String(error)}` });
       return;

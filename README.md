@@ -122,6 +122,16 @@ The installer needs no sudo. It copies the app, registers it with Launch Service
 
 Requires Xcode Command Line Tools to build, and Node.js 22.12+ or Bun on your login-shell `PATH` to run (Node is used when both are installed). The app starts the server with `--no-open` and stops it when you quit.
 
+## Windows app
+
+A small native launcher (no Electron) that runs the same server and shows it in an Edge app window. Closing the window stops the server. In PowerShell, with no administrator rights:
+
+```powershell
+irm https://os.flisk.si/install.ps1 | iex
+```
+
+Run it again to update. It installs to `%LOCALAPPDATA%\Programs\FliskOS` and adds FliskOS to the Start menu. It needs the Flisk CLI (`irm https://flisk.sh/install.ps1 | iex`) and Node.js 22.12+ or Bun. To build it, run `./windows/build.ps1` on Windows; it uses the C# compiler that ships with the system. `windows/AppIcon.ico` is drawn from `website/public/logo.svg`.
+
 ## Install as a command
 
 After a package release, install the published package globally and run:

@@ -282,7 +282,7 @@ function renderOverview() {
     ${collapsible("summary", "Summary", `<div class="gauges">${overviewGauges(ready, resources)}</div>${tokenBarMarkup(sumTokens(projects.map((project) => project.tokens)), "Generated share (est.)")}`)}
     ${pinnedResourcesPanel()}
     <div id="notice" class="notice" role="status"></div>
-    ${visible.length ? collapsible("projects", "Projects", `<section class="project-table" aria-label="Flisk projects">${rows}</section>`, `${visible.length} shown`) : `<div class="empty"><span class="empty-icon" aria-hidden="true">⌕</span><strong>${projects.length ? "No matching projects" : "No Flisk projects found"}</strong><p>${projects.length ? "Try another project name or folder path." : "FliskOS searches common development folders. Add a location with --scan-root or initialize a project with ${esc(cliProgram())} project."}</p></div>`}
+    ${visible.length ? collapsible("projects", "Projects", `<section class="project-table" aria-label="Flisk projects">${rows}</section>`, `${visible.length} shown`) : `<div class="empty"><span class="empty-icon" aria-hidden="true">⌕</span><strong>${projects.length ? "No matching projects" : "No Flisk projects found"}</strong><p>${projects.length ? "Try another project name or folder path." : `FliskOS searches common development folders. Add a location with --scan-root or initialize a project with ${esc(cliProgram())} project.`}</p></div>`}
   </div>`;
 }
 

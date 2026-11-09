@@ -157,6 +157,8 @@ h2 { margin: 0 0 12px; font-size: clamp(1.75rem, 3.4vw, 2.5rem); font-weight: 60
 .command code { min-width: 0; overflow-x: auto; font-size: 0.9rem; white-space: nowrap; }
 .command .button { flex: none; min-width: 5rem; padding: 8px 14px; font-size: 0.86rem; }
 .closing .needs { margin-top: 18px; }
+.os { margin: 22px 0 10px; color: var(--muted); font-size: 0.9rem; font-weight: 600; scroll-margin-top: 80px; }
+.closing .lede + .os { margin-top: 0; }
 
 footer { margin-top: 128px; padding: 24px 0 40px; border-top: 1px solid var(--line); color: var(--faint); font-size: 0.86rem; }
 footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }

@@ -23,9 +23,15 @@ describe("website worker", () => {
 		assert.equal(response.headers.get("location"), MAC_ZIP);
 	});
 
+	it("sends /download/windows to the latest Windows zip", async () => {
+		const response = await worker.fetch(new Request("https://os.flisk.si/download/windows"), {});
+		assert.equal(response.status, 302);
+		assert.equal(response.headers.get("location"), MAC_ZIP.replace("macOS", "windows"));
+	});
+
 	it("leaves every other /download path to the static files", async () => {
 		const env = { ASSETS: { fetch: () => new Response("asset", { status: 404 }) } };
-		const response = await worker.fetch(new Request("https://os.flisk.si/download/windows"), env);
+		const response = await worker.fetch(new Request("https://os.flisk.si/download/linux"), env);
 		assert.equal(response.status, 404);
 	});
 });
@@ -53,6 +59,12 @@ describe("website files", () => {
 		const build = readFileSync(new URL("../macos/build.sh", import.meta.url), "utf8");
 		assert.match(build, /FliskOS-macOS\.zip/);
 		assert.ok(read("install.sh").includes(MAC_ZIP));
+	});
+
+	it("installs the zip the Windows build produces", () => {
+		const build = readFileSync(new URL("../windows/build.ps1", import.meta.url), "utf8");
+		assert.match(build, /FliskOS-windows\.zip/);
+		assert.ok(read("install.ps1").includes(MAC_ZIP.replace("macOS", "windows")));
 	});
 
 	it("has an install script sh can parse", () => {

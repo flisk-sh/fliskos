@@ -5,6 +5,9 @@ docs/media/
 website/
 .github/
 
+# The Windows launcher ships in the release zip, not npm.
+windows/
+
 # npm ignores .gitignore once this file exists, so repeat its entries.
 node_modules/
 .DS_Store
