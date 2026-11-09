@@ -50,7 +50,24 @@ header.top .brand { display: flex; align-items: center; gap: 9px; margin-right: 
 	background-size: 44px 44px;
 	mask-image: radial-gradient(52rem 34rem at 50% 26%, #000 20%, transparent 100%);
 }
-.hero-copy { display: flex; flex-direction: column; align-items: center; padding-top: 88px; text-align: center; }
+.hero-copy { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 88px; text-align: center; }
+
+/* The agents FliskOS runs, floating around the headline. On narrower screens they sit in a row above it. */
+.hero-icons { display: flex; justify-content: center; gap: 10px; margin-bottom: 28px; }
+.tile { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line-strong); border-radius: 12px; background: linear-gradient(160deg, #1b1b1f, #0c0c0e); box-shadow: 0 14px 34px -14px #000, inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+.tile img { width: 56%; height: 56%; }
+.tile.fx { color: var(--text); font: 600 0.92rem var(--mono); letter-spacing: -0.04em; }
+
+@media (min-width: 1120px) {
+	.hero-icons { position: absolute; inset: 0; display: block; margin: 0; pointer-events: none; }
+	.tile { position: absolute; pointer-events: auto; rotate: var(--tilt); }
+	.tile.claude { --tilt: -8deg; left: 3%; top: 200px; width: 92px; height: 92px; border-radius: 24px; }
+	.tile.cursor { --tilt: 7deg; left: 17%; top: 56px; width: 68px; height: 68px; border-radius: 18px; }
+	.tile.fx { --tilt: 6deg; left: 11%; top: 430px; width: 72px; height: 72px; border-radius: 19px; font-size: 1.5rem; }
+	.tile.codex { --tilt: 8deg; right: 3%; top: 186px; width: 92px; height: 92px; border-radius: 24px; }
+	.tile.grok { --tilt: -7deg; right: 17%; top: 48px; width: 68px; height: 68px; border-radius: 18px; }
+	.tile.flisk { --tilt: -6deg; right: 11%; top: 418px; width: 72px; height: 72px; border-radius: 19px; }
+}
 
 h1 { margin: 0 0 22px; font-size: clamp(3rem, 7vw, 5rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; }
 .lede { max-width: 37rem; margin: 0 0 30px; color: var(--muted); font-size: 1.16rem; }
@@ -131,6 +148,15 @@ footer a { color: inherit; }
 	.hero-copy > :nth-child(2) { animation-delay: 0.06s; }
 	.hero-copy > :nth-child(3) { animation-delay: 0.12s; }
 	.hero-shot { animation-delay: 0.2s; }
+	@media (min-width: 1120px) {
+		.tile { animation: float 7s ease-in-out infinite; }
+		.tile.cursor { animation-duration: 8.5s; animation-delay: -2s; }
+		.tile.fx { animation-duration: 6.5s; animation-delay: -4s; }
+		.tile.codex { animation-duration: 8s; animation-delay: -5s; }
+		.tile.grok { animation-duration: 6s; animation-delay: -1s; }
+		.tile.flisk { animation-duration: 9s; animation-delay: -3s; }
+		@keyframes float { 50% { translate: 0 -12px; } }
+	}
 	@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 }
 
