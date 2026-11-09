@@ -1039,6 +1039,21 @@
       .apps-project .field { grid-auto-flow: column; align-items: center; }
           .brand-mark, .native .brand-mark { overflow: hidden; background: none; box-shadow: none; }
       .brand-mark svg { display: block; width: 100%; height: 100%; }
+
+      /* Long text stays inside its own cell, wraps where it can be read, and never runs under the buttons. */
+      .project-row > * { min-width: 0; }
+      .project-open, .row-title { min-width: 0; max-width: 100%; }
+      .row-title strong, .row-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .project-row > .row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
+      .project-row > .row-meta .badge { white-space: nowrap; }
+      .project-row > .row-meta.row-error { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+      .project-row > .row-actions { justify-self: end; }
+      .agent-row { gap: 12px; }
+      .agent-row .field { min-width: 0; }
+      .agent-row .field select { width: 100%; max-width: 100%; min-width: 0; }
+      .agent-row .mode-switch { max-width: 100%; }
+      .gauge-copy { min-width: 0; }
+      .gauge-copy span { white-space: normal; overflow: visible; }
     </style>
   </head>
   <body>
