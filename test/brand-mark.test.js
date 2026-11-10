@@ -39,3 +39,18 @@ describe("brand mark", () => {
 		}
 	});
 });
+
+describe("os.flisk.si icons", () => {
+	it("links icons Google can show: the logo SVG, a favicon.ico and a PNG whose size is a multiple of 48", () => {
+		for (const page of ["index.html", "404.html"]) {
+			const site = readFileSync(new URL(`../website/public/${page}`, import.meta.url), "utf8");
+			assert.match(site, /<link rel="icon" type="image\/svg\+xml" href="\/logo.svg">/, page);
+			assert.match(site, /<link rel="icon" href="\/favicon.ico"/, page);
+		}
+		const index = readFileSync(new URL("../website/public/index.html", import.meta.url), "utf8");
+		const png = index.match(/<link rel="icon" type="image\/png" sizes="(\d+)x\1" href="\/icon-192.png">/);
+		assert.ok(png && Number(png[1]) % 48 === 0);
+		const bytes = readFileSync(new URL("../website/public/icon-192.png", import.meta.url));
+		assert.equal(bytes.readUInt32BE(16), 192);
+	});
+});
