@@ -68,11 +68,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         html,body{margin:0;height:100%;background:transparent;font:15px -apple-system,sans-serif;color:#141413}
         @media(prefers-color-scheme:dark){body{color:#faf9f5}}
         .c{height:100%;display:grid;place-content:center;justify-items:center;gap:18px}
-        .m{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;font:700 30px -apple-system;color:#fff;background:linear-gradient(135deg,#ff8a65,#b4532f);box-shadow:0 12px 36px rgba(180,83,47,.4);animation:p 1.6s ease-in-out infinite}
-        .s{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(128,128,128,.3);border-top-color:#d9693f;animation:r .8s linear infinite}
+        .m{width:64px;height:64px;filter:drop-shadow(0 12px 28px rgba(15,20,38,.35));animation:p 1.6s ease-in-out infinite}.m svg{display:block;width:100%;height:100%}
+        .s{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(128,128,128,.3);border-top-color:#22c55e;animation:r .8s linear infinite}
         .t{opacity:.7;font-size:13px}
         @keyframes r{to{transform:rotate(360deg)}}@keyframes p{50%{transform:scale(1.06)}}
-        </style><div class=c><div class=m>T</div><div class=s></div><div class=t>\(status)</div></div>
+        </style><div class=c><div class=m><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" aria-hidden=\"true\"><defs><linearGradient id=\"g\" x1=\"20%\" y1=\"0%\" x2=\"80%\" y2=\"100%\"><stop offset=\"0\" stop-color=\"#6ff0ae\"/><stop offset=\"1\" stop-color=\"#1fae74\"/></linearGradient></defs><rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#0f1426\"/><path d=\"M45.2 21.6A19.5 19.5 0 1 1 18.8 21.6\" fill=\"none\" stroke=\"#fbfaf7\" stroke-width=\"6\" stroke-linecap=\"round\"/><path transform=\"translate(32 29.5) scale(.35) translate(-64 -64)\" d=\"M76 8 30 70h28l-8 50 48-66H70z\" fill=\"url(#g)\" stroke=\"#0f1426\" stroke-width=\"5\" stroke-linejoin=\"round\" paint-order=\"stroke\"/></svg></div><div class=s></div><div class=t>\(status)</div></div>
         """
     }
 

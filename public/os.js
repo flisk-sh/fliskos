@@ -78,7 +78,7 @@ function threadListMarkup() {
 function newThreadMarkup() {
   const draft = agents.draft;
   const list = sortedProjects();
-  if (!list.length) return `<div class="agent-form"><div class="empty"><span class="empty-icon" aria-hidden="true">F</span><strong>No Flisk projects yet</strong><p>Agents work inside a Flisk project. Create or open one first.</p></div></div>`;
+  if (!list.length) return `<div class="agent-form"><div class="empty">${logoIcon()}<strong>No Flisk projects yet</strong><p>Agents work inside a Flisk project. Create or open one first.</p></div></div>`;
   if (!list.some((project) => project.id === draft.project)) draft.project = selectedProjectId ?? list[0].id;
   const known = agents.providers ?? [];
   const installed = known.filter((provider) => provider.installed);
