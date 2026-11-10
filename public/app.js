@@ -20,6 +20,9 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "'": "&#39;",
 })[char]);
 
+// The FliskOS logo for empty states: the page's favicon is the canonical mark (flisk-emoji apps/fliskos.svg).
+const logoIcon = () => `<img class="empty-icon empty-logo" src="${esc(document.querySelector('link[rel="icon"]')?.href || "")}" alt="" aria-hidden="true">`;
+
 async function api(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -341,7 +344,7 @@ function renderDetail(project) {
     ${configSection(project)}
     ${toolsSection(project)}
     ${agentsSection(project)}
-    ${collapsible("stacks", "Stacks & resources", `<div class="stack-list">${project.pending ? `<div class="skel-row"></div><div class="skel-row"></div>` : stackMarkup || `<div class="empty"><span class="empty-icon" aria-hidden="true">F</span><strong>No resources found</strong><p>Initialize this folder with the Flisk CLI to add resources.</p></div>`}</div>`, `${resources.length} total <span class="scope-note">Stop and Restart act on the whole project</span><button class="link-btn" type="button" data-action="new-stack" data-project="${esc(project.id)}">${btnIcon("stack")}New stack</button><button class="link-btn" type="button" data-action="new-resource" data-project="${esc(project.id)}">${btnIcon("plus")}Add resource</button>`)}
+    ${collapsible("stacks", "Stacks & resources", `<div class="stack-list">${project.pending ? `<div class="skel-row"></div><div class="skel-row"></div>` : stackMarkup || `<div class="empty">${logoIcon()}<strong>No resources found</strong><p>Initialize this folder with the Flisk CLI to add resources.</p></div>`}</div>`, `${resources.length} total <span class="scope-note">Stop and Restart act on the whole project</span><button class="link-btn" type="button" data-action="new-stack" data-project="${esc(project.id)}">${btnIcon("stack")}New stack</button><button class="link-btn" type="button" data-action="new-resource" data-project="${esc(project.id)}">${btnIcon("plus")}Add resource</button>`)}
   </div>`;
 }
 

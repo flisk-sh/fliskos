@@ -23,4 +23,19 @@ describe("brand mark", () => {
 		const data = html.match(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml;base64,([^"]+)"/)[1];
 		assert.equal(Buffer.from(data, "base64").toString("utf8").trim(), logo);
 	});
+
+	it("shows the logo, not a letter tile, on the macOS splash while the server starts", () => {
+		const swift = readFileSync(new URL("../macos/main.swift", import.meta.url), "utf8");
+		const splash = swift.match(/static func splash[\s\S]*?"""([\s\S]*?)"""/)[1].replace(/\\"/g, '"');
+		const mark = splash.match(/<div class=m>([\s\S]*?)<\/div>/)[1];
+		assert.match(mark, /^<svg /);
+		assert.deepEqual(shapes(mark), shapes(logo));
+	});
+
+	it("uses the logo, not a letter, for the FliskOS empty states", () => {
+		for (const file of ["app.js", "os.js"]) {
+			const js = readFileSync(new URL(`../public/${file}`, import.meta.url), "utf8");
+			assert.doesNotMatch(js, /class="empty-icon" aria-hidden="true">F</, file);
+		}
+	});
 });
