@@ -79,4 +79,18 @@ describe("website files", () => {
 			}
 		}
 	});
+
+	it("shares a 1200x630 PNG card as og:image and twitter:image", () => {
+		const page = read("index.html");
+		const og = page.match(/<meta property="og:image" content="https:\/\/os\.flisk\.si\/([^"]+)">/)?.[1];
+		assert.ok(og, "index.html has no og:image on os.flisk.si");
+		assert.match(og, /\.png$/);
+		assert.ok(page.includes(`<meta name="twitter:image" content="https://os.flisk.si/${og}">`));
+		assert.match(page, /<meta property="og:image:width" content="1200">/);
+		assert.match(page, /<meta property="og:image:height" content="630">/);
+		const png = readFileSync(new URL(og, site));
+		assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `${og} is not a PNG`);
+		assert.equal(png.subarray(12, 16).toString("ascii"), "IHDR");
+		assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
+	});
 });
