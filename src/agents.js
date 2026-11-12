@@ -108,8 +108,13 @@ function searchDirs(env = process.env) {
   return [...new Set([...preferred, ...(env.PATH ?? "").split(delimiter).filter(Boolean)])];
 }
 
+// Variables a Claude Code session leaves in the shell that started FliskOS. Passed on, they make an agent use its
+// parent's login, which stops working when that session ends ("Not logged in"), so they are not passed on.
+const CLAUDE_SESSION_ENV = /^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_AGENT_SDK|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_PREVIEW_)/;
+
 export function agentEnv(env = process.env) {
-  return { ...env, PATH: searchDirs(env).join(delimiter) };
+  const kept = Object.fromEntries(Object.entries(env).filter(([key]) => !CLAUDE_SESSION_ENV.test(key)));
+  return { ...kept, PATH: searchDirs(env).join(delimiter) };
 }
 
 export function locateAgent(provider, env = process.env) {

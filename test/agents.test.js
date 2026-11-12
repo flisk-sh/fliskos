@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, it } from "node:test";
-import { AGENT_PROMPT_LIMIT, AgentError, applyAcpUpdate, createAgentHub, createRecorder, decidePermission, describeTool, parseClaudeEvent, parseCodexEvent, parseCursorEvent, promptArg } from "../src/agents.js";
+import { AGENT_PROMPT_LIMIT, AgentError, agentEnv, applyAcpUpdate, createAgentHub, createRecorder, decidePermission, describeTool, parseClaudeEvent, parseCodexEvent, parseCursorEvent, promptArg } from "../src/agents.js";
 import { startAppServer } from "../src/app.js";
 
 const FAKE_STREAM = fileURLToPath(new URL("./fixtures/fake-stream-agent.mjs", import.meta.url));
@@ -420,5 +420,16 @@ describe("agents API", () => {
     assert.equal((await call("/api/agents/threads", { project: project.id, provider: "claude", mode: "plan", prompt: "x".repeat(AGENT_PROMPT_LIMIT + 1) })).status, 400);
     assert.equal((await call("/api/agents/threads", { project: project.id, provider: "nope", mode: "plan", prompt: "hi" })).status, 400);
     assert.equal((await call("/api/agents/thread/send", { id: "missing0000", prompt: "hi" })).status, 404);
+  });
+});
+
+describe("agentEnv", () => {
+  it("drops the variables a Claude Code session leaves behind and keeps the rest", () => {
+    const env = agentEnv({ CLAUDECODE: "1", CLAUDE_CODE_ENTRYPOINT: "cli", CLAUDE_CODE_OAUTH_TOKEN: "t", CLAUDE_AGENT_SDK_VERSION: "1", CLAUDE_PID: "9", CLAUDE_EFFORT: "high", PATH: "/bin", HOME: "/h", ANTHROPIC_API_KEY: "k", OPENAI_API_KEY: "o" });
+    for (const key of Object.keys(env)) assert.doesNotMatch(key, /^CLAUDE/);
+    assert.equal(env.HOME, "/h");
+    assert.equal(env.ANTHROPIC_API_KEY, "k");
+    assert.equal(env.OPENAI_API_KEY, "o");
+    assert.ok(env.PATH.split(":").includes("/bin") || env.PATH.includes("/bin"));
   });
 });
