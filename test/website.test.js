@@ -67,6 +67,14 @@ describe("website files", () => {
 		assert.ok(read("install.ps1").includes(MAC_ZIP.replace("macOS", "windows")));
 	});
 
+	it("lets Flisk Analytics load and send events from flisk.sh", () => {
+		const csp = read("_headers").match(/^\s*Content-Security-Policy: (.+)$/m)?.[1] ?? "";
+		const directive = (name) => csp.split(";").map((d) => d.trim().split(/\s+/)).find(([n]) => n === name) ?? [];
+		assert.ok(directive("script-src").includes("https://flisk.sh"), "script-src must allow https://flisk.sh");
+		assert.ok(directive("script-src").includes("https://flisk.si"), "script-src must keep https://flisk.si");
+		assert.ok(directive("connect-src").includes("https://flisk.sh"), "connect-src must allow https://flisk.sh");
+	});
+
 	it("has an install script sh can parse", () => {
 		execFileSync("sh", ["-n", new URL("install.sh", site).pathname]);
 	});
