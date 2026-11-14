@@ -1,14 +1,16 @@
 name: Founding badge offer
 
 # When a community PR merges, invites its author to claim a numbered badge on Discord.
-# The same file runs in each public flisk-sh repo that takes outside PRs, and nothing in
-# it names the repo. flisk-sh/flisk posts this offer inside its own merged-PR thank-you.
+# The comment and the job are shared by every public flisk-sh repo: the job is
+# flisk-sh/.github/.github/workflows/founding-badge-offer.yml and the wording is
+# flisk-sh/.github/messages/claim-badge.md. Edit those, not this file. This file only
+# decides when it runs. flisk-sh/flisk posts the same steps inside its own thank-you.
 #
-# pull_request_target runs from the base branch with a write token, so this job never
-# checks out or runs PR code. It reads the PR only as data inside github-script.
+# pull_request_target runs from the base branch with a write token. The shared job never
+# checks out or runs PR code; it reads the PR only as data.
 
 on:
-  pull_request_target: # zizmor: ignore[dangerous-triggers] never checks out or runs PR code; only reads event data and posts one comment
+  pull_request_target: # zizmor: ignore[dangerous-triggers] never checks out or runs PR code; the shared job only reads event data and posts one comment
     types: [closed]
 
 permissions: {}
@@ -23,59 +25,6 @@ jobs:
       github.event.pull_request.user.type == 'User' &&
       !contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association) &&
       !contains(fromJSON('["kburym","odykyi","biomekonoko"]'), github.event.pull_request.user.login)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
     permissions:
       pull-requests: write
-    steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const pr = context.payload.pull_request;
-            const author = pr.user.login.toLowerCase();
-            const MARK = '<!-- flisk:founding-badge-offer -->';
-            const invite = 'https://discord.gg/qMu5Xn8Kaq';
-            const SEATS = 100;
-
-            // The Discord bot keeps the claimed seats in this issue. The count is a nicety,
-            // so a failure here falls back to wording without a number.
-            let seatsLeft = null;
-            try {
-              const { data: registry } = await github.rest.issues.get(
-                { owner: 'flisk-sh', repo: 'flisk', issue_number: 3518 });
-              const seats = JSON.parse(/<!-- flisk:founding-data (.*?) -->/s.exec(registry.body)[1]);
-              if (seats.some((s) => s.github?.toLowerCase() === author && !s.revoked)) {
-                core.info(`Skipping: @${pr.user.login} already has a numbered badge.`);
-                return;
-              }
-              seatsLeft = Math.max(SEATS - seats.length, 0);
-            } catch (e) {
-              core.warning(`Could not read the founding seats: ${e.message}`);
-            }
-
-            const comments = await github.paginate(github.rest.issues.listComments,
-              { owner, repo, issue_number: pr.number, per_page: 100 });
-            if (comments.some((c) => c.body?.includes(MARK))) return;
-
-            const founding = seatsLeft !== 0;
-            const badgeName = founding ? 'Founding Contributor' : 'Flisk Contributor';
-            const lockedBadge = `https://img.shields.io/static/v1?${new URLSearchParams({
-              label: `\u{1F512} ${badgeName.toUpperCase()}`,
-              message: founding && seatsLeft !== null ? `${seatsLeft} of ${SEATS} left` : 'claim yours',
-              color: '06b6d4', labelColor: '07080f', style: 'for-the-badge',
-            }).toString().replaceAll('+', '%20')}`;
-
-            const body = [
-              MARK,
-              `### 🔒 Unlock your numbered ${badgeName} badge`,
-              '',
-              `[![${badgeName} badge, locked](${lockedBadge})](${invite})`,
-              '',
-              founding
-                ? `The first ${SEATS} people to ship code to any flisk-sh repository each get a numbered, permanent badge for their GitHub profile or CV.`
-                : `All ${SEATS} Founding badges are taken, and yours is a numbered **Flisk Contributor** badge for your GitHub profile or CV.`,
-              '',
-              `To claim it, post this PR's link (\`${pr.html_url}\`) in \`#start-here\` on [our Discord](${invite}) and the bot gives you your number.`,
-            ].join('\n');
-            await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+    uses: flisk-sh/.github/.github/workflows/founding-badge-offer.yml@main
