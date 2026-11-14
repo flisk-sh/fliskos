@@ -94,3 +94,25 @@ describe("website files", () => {
 		assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
 	});
 });
+
+describe("website analytics", () => {
+	const tag = '<script defer data-domain="os.flisk.si" src="https://flisk.sh/a.js"></script>';
+
+	it("counts visits on both pages, once each, before the bar script", () => {
+		for (const page of ["index.html", "404.html"]) {
+			const html = read(page);
+			assert.equal(html.split(tag).length, 2, `${page} should carry the analytics tag once`);
+			assert.ok(html.indexOf(tag) < html.indexOf("https://flisk.si/assets/bar.js"), `${page}: tag comes before bar.js`);
+		}
+	});
+
+	it("lets the site policy load the script and send the beacon, and nothing else", () => {
+		const headers = read("_headers");
+		const csp = headers.split("\n").find((l) => l.trim().startsWith("Content-Security-Policy:")) ?? "";
+		assert.match(csp, /script-src [^;]*https:\/\/flisk\.sh/);
+		assert.match(csp, /connect-src https:\/\/analytics\.flisk\.si;/);
+		// the embedded demo keeps its own strict policy, with no analytics
+		const demo = headers.slice(headers.indexOf("/demo/*"));
+		assert.ok(!demo.includes("flisk.sh") && !demo.includes("analytics.flisk.si"));
+	});
+});
