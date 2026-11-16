@@ -213,3 +213,13 @@ footer a { color: inherit; }
 	html { scroll-behavior: auto; }
 	* { transition: none !important; }
 }
+
+@media (max-width: 640px) {
+  nav.wrap a,
+  .source a,
+  footer a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
