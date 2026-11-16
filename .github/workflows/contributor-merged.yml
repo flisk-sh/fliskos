@@ -235,7 +235,7 @@ jobs:
 
             if (!(await hasMark(pr.number, MARK_PR))) {
               const prLines = [MARK_PR, `## 🎉 Merged! Thank you @${author}`, '', milestone];
-              if (fixed) prLines.push('', `This fixes ${fixed}. It is now in `${pr.base.ref}`.`);
+              if (fixed) prLines.push('', `This fixes ${fixed}. It is now in \`${pr.base.ref}\`.`);
               await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: [...prLines, ...lines].join('\n') });
             }
 
@@ -249,7 +249,7 @@ jobs:
                 '',
                 milestone,
                 '',
-                `Merged into \`${pr.base.ref}\` as ${pr.merge_commit_sha.slice(0, 7)}. It is now in `${pr.base.ref}`. Still seeing this after the release? Comment here and we will take another look.`,
+                `Merged into \`${pr.base.ref}\` as ${pr.merge_commit_sha.slice(0, 7)}. Still seeing this after the next deploy? Comment here and we will take another look.`,
               ];
               await github.rest.issues.createComment({
                 owner, repo, issue_number: i.number,
