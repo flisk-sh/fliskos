@@ -1,0 +1,258 @@
+name: 🤖 BOT | Community | Contributor merged
+
+# Ported from flisk-sh/flisk: the numbered badge program and Hall of fame live there, so those lookups point at it.
+# Posts one thank-you on a community PR when it is merged, and the same full note
+# (rank, badges, next issues) on each issue that PR fixed. Maintainer and bot PRs are skipped.
+#
+# pull_request_target runs from the base branch with a write token, so this job never
+# checks out or runs PR code. Everything it reads (title, labels, author) is used only
+# as data inside github-script, never interpolated into a shell command.
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] never checks out or runs PR code; only reads event data and posts comments
+    types: [closed]
+  # Re-post for a merged PR whose run failed (for example on a GitHub rate limit).
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Merged PR number to thank
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: contributor-merged-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  thank:
+    name: Thank the contributor and note the fixed issues
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.user.type == 'User' &&
+      !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) &&
+      !contains(fromJSON('["kburym","odykyi"]'), github.event.pull_request.user.login))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const retry = async (fn) => {
+              try { return await fn(); } catch (e) {
+                // Secondary rate limit: wait out the burst once, then try again.
+                if (e.status !== 403 && e.status !== 429) throw e;
+                await new Promise((r) => setTimeout(r, 30000));
+                return fn();
+              }
+            };
+            const pr = context.payload.pull_request || (await github.rest.pulls.get(
+              { owner, repo, pull_number: Number(context.payload.inputs.pr_number) })).data;
+            const author = pr.user.login;
+            if (!pr.merged || pr.user.type !== 'User' || ['kburym', 'odykyi'].includes(author)) {
+              core.info(`Skipping #${pr.number}: not a merged community PR.`);
+              return;
+            }
+            const MARK_PR = '<!-- flisk:contributor-merged -->';
+            const MARK_ISSUE = `<!-- flisk:issue-fixed:${pr.number} -->`;
+            const base = `https://github.com/${owner}/${repo}`;
+            const discordInvite = 'https://discord.gg/qMu5Xn8Kaq';
+            // Shields reads `-` as a separator, so button text must not contain one.
+            const discordButton = (text) =>
+              `[![${text}](https://img.shields.io/badge/${encodeURIComponent(text)}-5865F2?style=for-the-badge&logo=discord&logoColor=white)](${discordInvite})`;
+            // shields.io splits badge segments on `-` and does not allow escaping
+            // hyphens, so hyphenated usernames (e.g. AK-Lmn) break the badge.
+            // Replace `-` with `_` in the badge subject only; the link text keeps
+            // the real login.
+            const badgeLogin = (login) => login.replace(/-/g, '_');
+            const badgeUrl = (login, prs) =>
+              `https://img.shields.io/badge/FLISK%20HALL%20OF%20FAME-${encodeURIComponent('@' + badgeLogin(login) + ' \u2022 ' + prs + (prs === 1 ? ' merged PR' : ' merged PRs'))}-06b6d4?style=for-the-badge&labelColor=07080f`;
+            const copySnippet = (login, prs) =>
+              `[![FLISK HALL OF FAME @${login} • ${prs} merged PR${prs === 1 ? '' : 's'}](${badgeUrl(login, prs)})](https://github.com/flisk-sh/flisk/issues?q=is%3Aissue+is%3Aopen+label%3Acommunity)`;
+
+            // How many numbered badges are left, from the issue the Discord bot keeps. The count
+            // is a nicety, so a failure here falls back to wording without a number.
+            const SEATS = 100;
+            let seatsLeft = null;
+            try {
+              const community = await retry(() => github.paginate(github.rest.issues.listForRepo,
+                { owner: 'flisk-sh', repo: 'flisk', state: 'open', labels: 'community', per_page: 100 }));
+              const registry = community.find((i) => i.body && i.body.includes('<!-- flisk:founding-registry -->'));
+              const data = /<!-- flisk:founding-data (.*?) -->/s.exec(registry?.body ?? '');
+              seatsLeft = Math.max(SEATS - (data ? JSON.parse(data[1]).length : 0), 0);
+            } catch (e) {
+              core.warning(`Could not count founding seats: ${e.message}`);
+            }
+            const founding = seatsLeft !== 0;
+            const badgeName = founding ? 'Founding Contributor' : 'Flisk Contributor';
+            const lockedBadgeUrl = `https://img.shields.io/static/v1?${new URLSearchParams({
+              label: `\u{1F512} ${badgeName.toUpperCase()}`,
+              message: founding && seatsLeft !== null ? `${seatsLeft} of ${SEATS} left` : 'claim yours',
+              color: '06b6d4', labelColor: '07080f', style: 'for-the-badge',
+            }).toString().replaceAll('+', '%20')}`;
+
+            const hasMark = async (number, mark) => {
+              const comments = await github.paginate(github.rest.issues.listComments,
+                { owner, repo, issue_number: number, per_page: 100 });
+              return comments.some((c) => c.body && c.body.includes(mark));
+            };
+
+            // Issues this PR closed (GitHub's own linking, so "Fixes #N" and the sidebar both count).
+            const linked = await github.graphql(
+              `query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){
+                 closingIssuesReferences(first:20){nodes{number title state labels(first:30){nodes{name}}}}}}}`,
+              { o: owner, r: repo, n: pr.number });
+            const issues = linked.repository.pullRequest.closingIssuesReferences.nodes;
+
+            // How many PRs this person has had merged here, counting this one.
+            // The search index can lag the merge by a few seconds, so add this PR if it is missing.
+            const found = (await retry(() => github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} is:pr is:merged author:${author}`,
+              sort: 'updated', order: 'desc', per_page: 5,
+            }))).data;
+            const mergedCount = found.total_count + (found.items.some((i) => i.number === pr.number) ? 0 : 1);
+
+            // Pick up to three open, unclaimed issues to try next: same area first, then anything at their level.
+            const labelNames = new Set([
+              ...pr.labels.map((l) => l.name),
+              ...issues.flatMap((i) => i.labels.nodes.map((l) => l.name)),
+            ]);
+            const areas = [...labelNames].filter((n) => n.startsWith('area: ') || n.startsWith('island: '));
+            // Kyu/dan ranks: 8 kyu is the easiest, then 7..1 kyu, then 1 dan and up.
+            const rankOf = (name) => {
+              const m = /^rank: (\d+) (kyu|dan)$/.exec(name);
+              return m ? { name: `${m[1]} ${m[2]}`, value: m[2] === 'dan' ? 100 + Number(m[1]) : 100 - Number(m[1]) } : null;
+            };
+            // An issue with no rank label counts as 8 kyu, the easiest rank.
+            const withDefaultRank = (names) => (names.some(rankOf) ? names : [...names, 'rank: 8 kyu']);
+            const bestRank = (labelLists) => labelLists.map(withDefaultRank).flat().map(rankOf).filter(Boolean)
+              .reduce((best, r) => (!best || r.value > best.value ? r : best), null);
+            const thisRank = bestRank(issues.map((i) => i.labels.nodes.map((l) => l.name)));
+            let rankLine = null;
+            if (thisRank) {
+              const prior = await retry(() => github.graphql(
+                `query($q:String!){search(query:$q,type:ISSUE,first:100){nodes{... on PullRequest{number
+                   closingIssuesReferences(first:10){nodes{labels(first:30){nodes{name}}}}}}}}`,
+                { q: `repo:${owner}/${repo} is:pr is:merged author:${author}` }));
+              const before = bestRank(prior.search.nodes.filter((n) => n.number !== pr.number)
+                .flatMap((n) => n.closingIssuesReferences.nodes.map((i) => i.labels.nodes.map((l) => l.name))));
+              const island = [...labelNames].find((n) => n.startsWith('island: '));
+              rankLine = `🥋 You cleared ${thisRank.name.startsWith('8') ? 'an' : 'a'} **${thisRank.name}** issue${island ? ` on ${island.replace('island: ', '')}` : ''}.`;
+              if (!before) rankLine += ` That sets your starting rank: **${thisRank.name}**.`;
+              else if (thisRank.value > before.value) rankLine += ` **Rank up!** Your highest rank goes from ${before.name} to **${thisRank.name}**. 🎊`;
+              else rankLine += ` Your highest rank is still **${before.name}**. Take a harder one to rank up.`;
+              // Link to open issues one step above the highest rank reached, so the next fix is easy to find.
+              const highest = before && before.value > thisRank.value ? before : thisRank;
+              const nextValue = highest.value === 99 ? 101 : highest.value + 1; // no value 100: 1 kyu leads to 1 dan
+              const nextName = nextValue < 100 ? `${100 - nextValue} kyu` : nextValue > 100 ? `${nextValue - 100} dan` : null;
+              if (nextName) {
+                const label = encodeURIComponent(`rank: ${nextName}`);
+                rankLine += ` Next up: [open ${nextName} issues](${base}/issues?q=is%3Aissue+is%3Aopen+label%3A%22${label}%22).`;
+              }
+            }
+
+            // Offer harder work as people merge more: easy -> medium -> hard.
+            const level = mergedCount >= 10 ? 'label:"difficulty: hard"'
+              : mergedCount >= 3 ? 'label:"difficulty: medium"' : 'label:"good first issue"';
+            // One search, then pick by area in JS: several searches in a row trip the secondary rate limit.
+            // Suggestions are a nicety, so a failure here must not stop the thank-you.
+            let next = [];
+            try {
+              const items = (await retry(() => github.rest.search.issuesAndPullRequests({
+                q: `repo:${owner}/${repo} is:issue is:open no:assignee ${level}`,
+                sort: 'created', order: 'desc', per_page: 30,
+              }))).data.items;
+              const inArea = (i) => i.labels.some((l) => areas.includes(l.name));
+              next = [...items.filter(inArea), ...items.filter((i) => !inArea(i))].slice(0, 3);
+            } catch (e) {
+              core.warning(`Could not look up next issues: ${e.message}`);
+            }
+
+            const fixed = issues.map((i) => `#${i.number}`).join(', ');
+            const ordinal = (n) => `${n}${['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) || n % 10 > 3 ? 0 : n % 10]}`;
+            const MILESTONES = {
+              1: 'This is your first merged PR here. Welcome to Flisk! 💜',
+              2: 'Your 2nd merged PR. Coming back for a second one means a lot. 💜',
+              3: 'Your 3rd merged PR. You now know this codebase well enough that we will point you at medium-difficulty issues. 🌱',
+              5: 'Your 5th merged PR. That makes you a regular contributor, and we are glad to have you. 🌟',
+              10: 'Your 10th merged PR! Double digits. You have shaped a real part of Flisk, and we would love your view on direction too: open an issue or RFC any time. 🚀',
+              15: 'Your 15th merged PR. At this point you are practically a maintainer. Would you like to help review other contributors\' PRs? Just say so. 🙌',
+              20: 'Your 20th merged PR. Remarkable consistency, thank you for sticking with Flisk. 🏔️',
+              30: 'Your 30th merged PR. Flisk is measurably better because of you. 💎',
+              50: 'Your 50th merged PR! This is a rare milestone. We would like to invite you to become a maintainer: a maintainer will reach out. 👑',
+              80: 'Your 80th merged PR. Few projects are lucky enough to have a contributor like you. Thank you. 🏆',
+              100: 'Your 100th merged PR! 🎉🎉🎉 An extraordinary contribution to Flisk. Thank you, truly. 💯',
+            };
+            const milestone = MILESTONES[mergedCount]
+              || `That is your ${ordinal(mergedCount)} merged PR here. We really appreciate you coming back. 💜`;
+            // Everything below the opening lines is shared by the PR comment and each fixed issue's comment.
+            const lines = [];
+            if (rankLine) lines.push('', rankLine);
+            // The Hall of Fame badge is shown rendered; the Markdown to copy sits in a fenced block,
+            // because a badge wrapped in inline code renders as plain text.
+            lines.push('', '### 🏅 Your Hall of Fame badge');
+            lines.push('', copySnippet(author, mergedCount));
+            // Link the open hall-of-fame issue so a new contributor can find their place on it.
+            try {
+              const hall = (await retry(() => github.rest.search.issuesAndPullRequests({
+                q: `repo:flisk-sh/flisk is:issue is:open in:title "Hall of fame: community contributors"`, per_page: 1,
+              }))).data.items[0];
+              if (hall) lines.push('', `You will appear on the [Hall of fame](${hall.html_url}) once it refreshes.`);
+            } catch (e) {
+              core.warning(`Could not look up the hall of fame issue: ${e.message}`);
+            }
+            lines.push('', '<details>');
+            lines.push('<summary>Copy it into your portfolio or README</summary>');
+            lines.push('', '```markdown', copySnippet(author, mergedCount), '```');
+            lines.push('', '</details>');
+            lines.push('', `### 🔒 Unlock your numbered ${badgeName} badge`);
+            lines.push('', `[![${badgeName} badge, locked](${lockedBadgeUrl})](${discordInvite})`);
+            lines.push('', founding
+              ? `The first ${SEATS} people to ship code to Flisk each get a numbered, permanent badge to show on their GitHub profile or CV. Post this PR's link in \`#start-here\` on [our Discord](${discordInvite}) and the bot gives you your number and your badge, plus access to the private channel where contributors talk directly with the maintainers.`
+              : `All ${SEATS} Founding badges are taken, and yours is a numbered **Flisk Contributor** badge for your GitHub profile or CV. Post this PR's link in \`#start-here\` on [our Discord](${discordInvite}) and the bot gives you your number and your badge, plus access to the private channel where contributors talk directly with the maintainers.`);
+            lines.push('', discordButton('Claim your badge'));
+            if (next.length) {
+              lines.push('', '### 🎯 Ready for another one?');
+              lines.push('', 'These are open and unclaimed. Comment on one to claim it:', '');
+              // GitHub expands a bare #123 list item to the issue title, so adding the title shows it twice.
+              for (const i of next) lines.push(`- #${i.number}`);
+            }
+            lines.push('', '---');
+            // Ask for a star only if the author's public starred list does not include this repo.
+            // A hidden star list looks unstarred, so the ask can show up for a starred user; that is harmless.
+            const starred = await retry(() => github.paginate(github.rest.activity.listReposStarredByUser,
+              { username: author, per_page: 100 })).catch(() => null);
+            if (starred && !starred.some((r) => r.full_name === `${owner}/${repo}`)) {
+              lines.push('', `⭐ If Flisk helps you, [a star on ${owner}/${repo}](${base}) helps other people find it.`);
+            }
+            lines.push('', 'Was anything unclear while you worked on this? Tell us in a comment. That is how the contributor guide gets better.');
+
+            if (!(await hasMark(pr.number, MARK_PR))) {
+              const prLines = [MARK_PR, `## 🎉 Merged! Thank you @${author}`, '', milestone];
+              if (fixed) prLines.push('', `This fixes ${fixed}. It is now in \`${pr.base.ref}\`.`);
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: [...prLines, ...lines].join('\n') });
+            }
+
+            // The same full note on each fixed issue, so the issue thread explains why it closed
+            // and people who follow the issue see the rank, the badges and what to pick up next.
+            for (const i of issues) {
+              if (await hasMark(i.number, MARK_ISSUE)) continue;
+              const issueLines = [
+                MARK_ISSUE,
+                `## ✅ Fixed by #${pr.number}. Thank you @${author}! 💜`,
+                '',
+                milestone,
+                '',
+                `Merged into \`${pr.base.ref}\` as ${pr.merge_commit_sha.slice(0, 7)}. Still seeing this after the next deploy? Comment here and we will take another look.`,
+              ];
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: i.number,
+                body: [...issueLines, ...lines].join('\n'),
+              });
+            }
