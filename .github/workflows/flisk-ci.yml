@@ -19,11 +19,11 @@ concurrency:
 jobs:
   dependency-review:
     if: github.event_name == 'pull_request'
-    uses: flisk-sh/.github/.github/workflows/dependency-review.yml@16754801a8248cfa1525152ff5fc74e4cb12babf # v1.2.0
+    uses: flisk-sh/.github/.github/workflows/dependency-review.yml@b5eeea945364038cd2143e9676b77fc9af293dfa # v1.4.0
 
   codeql:
     permissions:
       contents: read
       security-events: write
       actions: read
-    uses: flisk-sh/.github/.github/workflows/codeql.yml@16754801a8248cfa1525152ff5fc74e4cb12babf # v1.2.0
+    uses: flisk-sh/.github/.github/workflows/codeql.yml@b5eeea945364038cd2143e9676b77fc9af293dfa # v1.4.0
