@@ -36,6 +36,63 @@ describe("website worker", () => {
 	});
 });
 
+describe("website security headers", () => {
+	const BASELINE = {
+		"x-content-type-options": "nosniff",
+		"x-frame-options": "SAMEORIGIN",
+		"strict-transport-security": "max-age=31536000; includeSubDomains",
+		"referrer-policy": "strict-origin-when-cross-origin",
+		"permissions-policy": "camera=(), microphone=(), geolocation=()",
+	};
+	const expectBaseline = (response) => {
+		for (const [name, value] of Object.entries(BASELINE)) assert.equal(response.headers.get(name), value, name);
+		assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors/);
+	};
+
+	it("are on the download redirects", async () => {
+		expectBaseline(await worker.fetch(new Request("https://os.flisk.si/download/mac"), {}));
+	});
+
+	it("are on a 404 and on a normal response passed through from the assets", async () => {
+		const env = { ASSETS: { fetch: (r) => (r.url.endsWith("/ok") ? new Response("hi") : new Response("nope", { status: 404 })) } };
+		const ok = await worker.fetch(new Request("https://os.flisk.si/download/ok"), env);
+		assert.equal(ok.status, 200);
+		expectBaseline(ok);
+		const missing = await worker.fetch(new Request("https://os.flisk.si/download/linux"), env);
+		assert.equal(missing.status, 404);
+		expectBaseline(missing);
+	});
+
+	it("keep a CSP and headers the response already has", async () => {
+		const csp = "default-src 'none'; frame-ancestors 'none'";
+		const env = { ASSETS: { fetch: () => new Response("x", { headers: { "content-security-policy": csp, "x-frame-options": "DENY" } }) } };
+		const response = await worker.fetch(new Request("https://os.flisk.si/download/x"), env);
+		assert.equal(response.headers.get("content-security-policy"), csp);
+		assert.equal(response.headers.get("x-frame-options"), "DENY");
+	});
+
+	it("add frame-ancestors to a CSP that lacks it", async () => {
+		const env = { ASSETS: { fetch: () => new Response("x", { headers: { "content-security-policy": "default-src 'self'" } }) } };
+		const response = await worker.fetch(new Request("https://os.flisk.si/download/x"), env);
+		assert.equal(response.headers.get("content-security-policy"), "default-src 'self'; frame-ancestors 'self'");
+	});
+
+	it("are in public/_headers for every static file, once each, with a CSP that has frame-ancestors", () => {
+		const all = read("_headers").split(/\n(?=\S)/).find((block) => block.startsWith("/*")) ?? "";
+		for (const [name, value] of Object.entries(BASELINE)) {
+			const lines = all.split("\n").filter((l) => l.trim().toLowerCase().startsWith(`${name}:`));
+			assert.equal(lines.length, 1, `${name} must be set exactly once under /*`);
+			assert.equal(lines[0].slice(lines[0].indexOf(":") + 1).trim(), value);
+		}
+		assert.match(all, /Content-Security-Policy: .*frame-ancestors /);
+	});
+
+	it("still lets the embedded demo be framed by this site", () => {
+		const demo = read("_headers").slice(read("_headers").indexOf("/demo/*"));
+		assert.match(demo, /frame-ancestors 'self'/);
+	});
+});
+
 describe("website demo", () => {
 	it("publishes nothing from the machine that builds it", async () => {
 		const out = mkdtempSync(join(tmpdir(), "fliskos-demo-test-"));
