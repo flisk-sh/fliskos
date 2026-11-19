@@ -1,0 +1,18 @@
+# FliskOS
+
+> A free, local desktop app that puts every Flisk project and the coding agents working on them in one window.
+
+FliskOS runs on macOS and Windows. It starts, stops and restarts projects, shows a doctor score for each one, and gives you one place to talk to the agents on a thread. It never asks for an API key: each agent runs in the project folder on your own login.
+
+## Key pages
+
+- [Home](https://os.flisk.si/): product overview and screenshots
+- [Download for macOS](https://os.flisk.si/download/mac): latest release zip
+- [Download for Windows](https://os.flisk.si/download/windows): latest release zip
+- [Install script](https://os.flisk.si/install.sh): the script run once after installing the app
+- [Live demo](https://os.flisk.si/demo/): the real app running on sample projects, no sign-in
+
+## More
+
+- [Sitemap](https://os.flisk.si/sitemap.xml)
+- [Source and issues](https://github.com/flisk-sh/fliskos)
