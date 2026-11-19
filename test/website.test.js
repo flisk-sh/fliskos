@@ -181,3 +181,28 @@ describe("website analytics", () => {
 		assert.ok(!demo.includes("flisk.sh") && !demo.includes("analytics.flisk.si"));
 	});
 });
+
+describe("website security.txt", () => {
+	const file = () => read(".well-known/security.txt");
+
+	it("publishes a contact and a canonical URL under /.well-known/", () => {
+		const text = file();
+		assert.match(text, /^Contact: https:\/\/github\.com\/flisk-sh\/fliskos\/security\/advisories\/new$/m);
+		assert.match(text, /^Canonical: https:\/\/os\.flisk\.si\/\.well-known\/security\.txt$/m);
+		assert.match(text, /^Preferred-Languages: en$/m);
+	});
+
+	it("expires at least six months from now", () => {
+		const expires = file().match(/^Expires: (\S+)$/m)?.[1];
+		assert.ok(expires, "security.txt has no Expires line");
+		assert.ok(!Number.isNaN(Date.parse(expires)), `bad Expires date: ${expires}`);
+		assert.ok(Date.parse(expires) > Date.now() + 180 * 24 * 60 * 60 * 1000, "Expires is less than six months away");
+	});
+
+	it("is served as plain text and is cacheable", () => {
+		const block = read("_headers").split(/\n(?=\S)/).find((b) => b.startsWith("/.well-known/security.txt")) ?? "";
+		assert.match(block, /^\/\.well-known\/security\.txt$/m);
+		assert.match(block, /Content-Type: text\/plain; charset=utf-8/);
+		assert.match(block, /Cache-Control: public, max-age=86400/);
+	});
+});
