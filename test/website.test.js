@@ -182,6 +182,36 @@ describe("website analytics", () => {
 	});
 });
 
+describe("website llms.txt", () => {
+	const LLMS = "llms.txt";
+
+	it("publishes a plain-text summary that names the product and links to real pages", () => {
+		assert.ok(existsSync(new URL(LLMS, site)), "website/public/llms.txt is missing");
+		const text = read(LLMS);
+		assert.match(text, /^# FliskOS/m);
+		assert.ok(text.includes("https://os.flisk.si/"), "links to the home page");
+		assert.ok(text.includes("https://os.flisk.si/download/mac"), "links to the macOS download");
+		assert.ok(text.includes("https://os.flisk.si/demo/"), "links to the live demo");
+	});
+
+	it("is served as text/plain and cached by the static host", () => {
+		const headers = read("_headers");
+		const rule = headers.split(/\n\s*\n/).find((block) => block.trimStart().startsWith("/llms.txt"));
+		assert.ok(rule, "a /llms.txt rule is required");
+		assert.match(rule, /Content-Type:\s*text\/plain/);
+		assert.match(rule, /Cache-Control:\s*public, max-age=\d+/);
+	});
+
+	it("passes the static file through the worker unchanged", async () => {
+		const body = read(LLMS);
+		const env = { ASSETS: { fetch: () => new Response(body, { headers: { "content-type": "text/plain; charset=utf-8" } }) } };
+		const response = await worker.fetch(new Request("https://os.flisk.si/llms.txt"), env);
+		assert.equal(response.status, 200);
+		assert.match(response.headers.get("content-type") ?? "", /^text\/plain/);
+		assert.equal(await response.text(), body);
+	});
+});
+
 describe("website security.txt", () => {
 	const file = () => read(".well-known/security.txt");
 
