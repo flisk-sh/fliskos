@@ -74,7 +74,7 @@ describe("website security headers", () => {
 	it("add frame-ancestors to a CSP that lacks it", async () => {
 		const env = { ASSETS: { fetch: () => new Response("x", { headers: { "content-security-policy": "default-src 'self'" } }) } };
 		const response = await worker.fetch(new Request("https://os.flisk.si/download/x"), env);
-		assert.equal(response.headers.get("content-security-policy"), "default-src 'self'; frame-ancestors 'self'");
+		assert.equal(response.headers.get("content-security-policy"), "default-src 'self'; frame-ancestors 'self' https://analytics.flisk.si");
 	});
 
 	it("are in public/_headers for every static file, once each, with a CSP that has frame-ancestors", () => {
@@ -209,5 +209,30 @@ describe("website llms.txt", () => {
 		assert.equal(response.status, 200);
 		assert.match(response.headers.get("content-type") ?? "", /^text\/plain/);
 		assert.equal(await response.text(), body);
+	});
+});
+
+describe("website security.txt", () => {
+	const file = () => read(".well-known/security.txt");
+
+	it("publishes a contact and a canonical URL under /.well-known/", () => {
+		const text = file();
+		assert.match(text, /^Contact: https:\/\/github\.com\/flisk-sh\/fliskos\/security\/advisories\/new$/m);
+		assert.match(text, /^Canonical: https:\/\/os\.flisk\.si\/\.well-known\/security\.txt$/m);
+		assert.match(text, /^Preferred-Languages: en$/m);
+	});
+
+	it("has not expired yet", () => {
+		const expires = file().match(/^Expires: (\S+)$/m)?.[1];
+		assert.ok(expires, "security.txt has no Expires line");
+		assert.ok(!Number.isNaN(Date.parse(expires)), `bad Expires date: ${expires}`);
+		assert.ok(Date.parse(expires) > Date.now(), "security.txt has expired: bump the Expires line");
+	});
+
+	it("is served as plain text and is cacheable", () => {
+		const block = read("_headers").split(/\n(?=\S)/).find((b) => b.startsWith("/.well-known/security.txt")) ?? "";
+		assert.match(block, /^\/\.well-known\/security\.txt$/m);
+		assert.match(block, /Content-Type: text\/plain; charset=utf-8/);
+		assert.match(block, /Cache-Control: public, max-age=86400/);
 	});
 });
