@@ -74,7 +74,7 @@ describe("website security headers", () => {
 	it("add frame-ancestors to a CSP that lacks it", async () => {
 		const env = { ASSETS: { fetch: () => new Response("x", { headers: { "content-security-policy": "default-src 'self'" } }) } };
 		const response = await worker.fetch(new Request("https://os.flisk.si/download/x"), env);
-		assert.equal(response.headers.get("content-security-policy"), "default-src 'self'; frame-ancestors 'self'");
+		assert.equal(response.headers.get("content-security-policy"), "default-src 'self'; frame-ancestors 'self' https://analytics.flisk.si");
 	});
 
 	it("are in public/_headers for every static file, once each, with a CSP that has frame-ancestors", () => {
