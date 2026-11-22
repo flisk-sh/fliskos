@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self' https://flisk.si https://flisk.sh; connect-src https://analytics.flisk.si; style-src 'self' 'unsafe-inline'; img-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://analytics.flisk.si
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://flisk.si https://flisk.sh; connect-src https://analytics.flisk.si; style-src 'self' 'unsafe-inline'; img-src 'self' https://flisk.si; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://analytics.flisk.si
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
