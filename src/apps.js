@@ -6,10 +6,10 @@ import { isAbsolute, join, resolve } from "node:path";
 export const FLISK_APPS = [
   { id: "pages", name: "Pages", url: "https://pages.flisk.si", blurb: "Your agent builds a page. One command makes it a public link." },
   { id: "citable", name: "Citable", url: "https://citable.flisk.si", blurb: "Can AI answers cite your site? A score out of 100 and the fixes." },
-  { id: "helpdock", name: "Helpdock", url: "https://helpdock.flisk.sh", blurb: "A repo's docs as a help center and an MCP server for your agent." },
-  { id: "cmd", name: "Command Comparer", url: "https://cmd.flisk.sh", blurb: "Flisk commands next to Compose, Tilt, Terraform and more." },
+  { id: "helpdock", name: "Helpdock", url: "https://helpdock.flisk.si", blurb: "A repo's docs as a help center and an MCP server for your agent." },
+  { id: "cmd", name: "Command Comparer", url: "https://cmd.flisk.si", blurb: "Flisk commands next to Compose, Tilt, Terraform and more." },
   { id: "roadmap", name: "DevEx Roadmap", url: "https://roadmap.flisk.si", blurb: "Community map of local DevEx tools, with a source for every dot." },
-  { id: "demo", name: "Demos", url: "https://demo.flisk.sh", blurb: "Reply @grok bubbles on X and get a running local stack." },
+  { id: "demo", name: "Demos", url: "https://demo.flisk.si", blurb: "Reply @grok bubbles on X and get a running local stack." },
 ];
 
 // "owner/repo" for a GitHub remote URL in any of the usual forms, or null.
@@ -51,8 +51,8 @@ export function appsForProject(project, resources = []) {
     ] : [],
     citable: frontends.map((resource) => ({ kind: "copy", label: `Check ${resource.name}`, value: `npx @flisk-sh/citable ${resource.url}` })),
     helpdock: repo ? [
-      { kind: "link", label: `Docs for ${repo}`, href: `https://helpdock.flisk.sh/${repo}` },
-      { kind: "copy", label: "Copy MCP URL", value: `https://helpdock.flisk.sh/${repo}/mcp` },
+      { kind: "link", label: `Docs for ${repo}`, href: `https://helpdock.flisk.si/${repo}` },
+      { kind: "copy", label: "Copy MCP URL", value: `https://helpdock.flisk.si/${repo}/mcp` },
     ] : [],
     cmd: [],
     roadmap: [],

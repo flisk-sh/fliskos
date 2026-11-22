@@ -22,6 +22,17 @@ function checkout(remote) {
 }
 
 describe("Flisk apps", () => {
+  it("links every app tile at its flisk.si host, not a redirecting flisk.sh host", () => {
+    const stale = FLISK_APPS.filter((app) => {
+      try {
+        return new URL(app.url).hostname.endsWith(".flisk.sh");
+      } catch {
+        return false;
+      }
+    });
+    assert.deepEqual(stale.map((app) => app.id), []);
+  });
+
   it("reads owner/repo from every usual GitHub remote form and nothing else", () => {
     assert.equal(githubRepo("https://github.com/flisk-sh/flisk.git"), "flisk-sh/flisk");
     assert.equal(githubRepo("https://github.com/flisk-sh/flisk"), "flisk-sh/flisk");
@@ -57,8 +68,8 @@ describe("Flisk apps", () => {
     assert.deepEqual(apps.map((app) => app.id), FLISK_APPS.map((app) => app.id));
     const byId = Object.fromEntries(apps.map((app) => [app.id, app]));
     assert.deepEqual(byId.helpdock.actions, [
-      { kind: "link", label: "Docs for flisk-sh/helpdock", href: "https://helpdock.flisk.sh/flisk-sh/helpdock" },
-      { kind: "copy", label: "Copy MCP URL", value: "https://helpdock.flisk.sh/flisk-sh/helpdock/mcp" },
+      { kind: "link", label: "Docs for flisk-sh/helpdock", href: "https://helpdock.flisk.si/flisk-sh/helpdock" },
+      { kind: "copy", label: "Copy MCP URL", value: "https://helpdock.flisk.si/flisk-sh/helpdock/mcp" },
     ]);
     assert.deepEqual(byId.citable.actions, [{ kind: "copy", label: "Check web", value: "npx @flisk-sh/citable http://web.helpdock.localhost:8080" }]);
     assert.equal(byId.pages.actions[0].kind, "agent");
@@ -89,7 +100,7 @@ describe("Flisk apps", () => {
     };
     const listed = await get(`/api/apps?project=${project.id}`);
     assert.equal(listed.status, 200);
-    assert.equal(listed.body.apps.find((app) => app.id === "helpdock").actions[0].href, "https://helpdock.flisk.sh/flisk-sh/pages");
+    assert.equal(listed.body.apps.find((app) => app.id === "helpdock").actions[0].href, "https://helpdock.flisk.si/flisk-sh/pages");
     assert.equal((await get("/api/apps")).body.apps.length, FLISK_APPS.length);
     assert.equal((await get("/api/apps?project=missing")).status, 400);
   });
