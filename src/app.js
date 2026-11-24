@@ -931,10 +931,28 @@ export function startAppServer({ projects, projectsReady = Promise.resolve(), pr
   // Stale-while-revalidate status cache: answers instantly after the first load, refreshes in the background.
   const statusCache = new Map();
   const STATUS_FRESH_MS = 4000;
+  const STATUS_CONCURRENCY = 4;
+  const waitingForStatus = [];
+  let activeStatus = 0;
+  const readProjectStatus = async (project) => {
+    if (activeStatus < STATUS_CONCURRENCY) {
+      activeStatus++;
+    } else {
+      await new Promise((resolve) => waitingForStatus.push(resolve));
+    }
+    try {
+      return await projectStatus(project, runCommand);
+    } finally {
+      // Hand the slot directly to the next queued refresh.
+      const next = waitingForStatus.shift();
+      if (next) next();
+      else activeStatus--;
+    }
+  };
   const refreshStatus = (project) => {
     const entry = statusCache.get(project.id) ?? {};
     if (entry.pending) return entry.pending;
-    entry.pending = projectStatus(project, runCommand).catch((error) => ({
+    entry.pending = readProjectStatus(project).catch((error) => ({
       project, resources: [], stacks: [], ports: [], tiltRunning: false,
       error: error instanceof Error ? error.message : String(error),
     })).then((snapshot) => {

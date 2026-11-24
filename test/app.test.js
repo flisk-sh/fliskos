@@ -332,6 +332,50 @@ describe("FliskOS local server", () => {
     }]);
   });
 
+  for (const prewarm of [false, true]) {
+    it(`limits concurrent project status commands with prewarm=${prewarm}`, async () => {
+      const projects = Array.from({ length: 9 }, (_, index) => ({
+        id: `project-${index}`, name: `project-${index}`, root: `/projects/project-${index}`,
+      }));
+      const { promise: gate, resolve: release } = Promise.withResolvers();
+      const statusCalls = [];
+      let active = 0;
+      let peak = 0;
+      const runCommand = async (project, [command]) => {
+        if (command === "status") statusCalls.push(project.id);
+        active++;
+        peak = Math.max(peak, active);
+        try {
+          await gate;
+          if (command === "status" && project === projects[0]) throw new Error("Status unavailable");
+          return { status: 0, stderr: "", stdout: JSON.stringify({ data: {} }) };
+        } finally {
+          active--;
+        }
+      };
+      const started = await serverFor({ projects, runCommand, prewarm, probe: async () => supported });
+      const get = (path) => fetch(new URL(path, started.url), { headers: { "x-flisk-token": started.token } });
+      try {
+        const response = await get("/api/projects?fast=1");
+        assert.equal(response.status, 200);
+        const fast = await response.json();
+        assert.equal(fast.projects.length, projects.length);
+        assert.ok(fast.projects.every((project) => project.pending));
+      } finally {
+        release();
+      }
+      const response = await get("/api/projects");
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.deepEqual(result.projects.map((project) => project.id), projects.map((project) => project.id));
+      assert.ok(result.projects.every((project) => !project.pending));
+      assert.equal(result.projects[0].error, "Status unavailable");
+      assert.equal(result.projects.filter((project) => project.error).length, 1);
+      assert.deepEqual(statusCalls.sort(), projects.map((project) => project.id).sort());
+      assert.equal(peak, 4);
+    });
+  }
+
   it("gives bring-your-own resources a direct endpoint from directUrl or their declared port", async () => {
     const runCommand = async () => ({
       status: 0,
